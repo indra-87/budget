@@ -491,7 +491,7 @@ const imp = { table: null, headerRow: 0, cols: null, items: [], filter: 'all', f
 let XLSX = null;
 
 function bindImport() {
-  const opts = [...CARDS.map((c) => [c.id, c.name]), ['체크카드', '체크카드'], ['기타', '기타']];
+  const opts = [...CARDS.map((c) => [c.id, c.name]), ['순천사랑', '순천사랑'], ['기타', '기타']];
   $('#impPay').innerHTML = opts.map(([v, l]) => `<option value="${esc(v)}">${esc(l)}</option>`).join('');
   $('#impPay').addEventListener('change', runClassify);
   $('#impFile').addEventListener('change', onImportFile);
@@ -596,7 +596,7 @@ function renderCardMap() {
     $('#impMap').appendChild(box);
   }
   if (!labels.length) { box.innerHTML = ''; return; }
-  const opts = [...CARDS.map((c) => [c.id, c.name]), ['체크카드', '체크카드'], ['기타', '기타'], ['skip', '가져오지 않음']];
+  const opts = [...CARDS.map((c) => [c.id, c.name]), ['순천사랑', '순천사랑'], ['기타', '기타'], ['skip', '가져오지 않음']];
   const map = state.settings.cardMap || {};
   box.innerHTML = '<span class="lbl">파일 안의 카드 구분</span>' + labels.map((l) => {
     const n = imp.rows.filter((r) => r.cardLabel === l).length;

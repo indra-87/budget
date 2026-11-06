@@ -26,7 +26,7 @@ export const DEFAULT_MERCHANTS = [
   '스타벅스', 'GS25', 'CU', '세븐일레븐', '카카오T',
 ];
 
-export const OTHER_METHODS = ['현금', '체크카드', '계좌이체', '기타'];
+export const OTHER_METHODS = ['현금', '순천사랑', '계좌이체', '기타'];
 // 구글폼에서 옮겨온 기존 기록처럼 결제수단을 모르는 내역
 export const LEGACY_METHOD = '미기록';
 
