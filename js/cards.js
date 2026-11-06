@@ -102,7 +102,7 @@ const SOL_LABEL = { fuel: '주유', online: '온라인쇼핑', delivery: '배달
 // 누적이 30만원에 도달하거나 넘게 만드는 결제는 건 전체가 기본적립까지 제외되고,
 // 그 금액도 누적에 포함되므로 이후 같은 영역 결제는 계속 제외됩니다.
 // (예: 29만원 사용 후 9,000원 → 적립 / 10,000원 이상 → 제외)
-// 담을수록 SOLSOL: OTT·멤버십·통신요금 자동납부 100% 적립 (통합 6만원 한도와 별도)
+// 담을수록 SOLSOL: OTT·멤버십·통신요금 자동납부 100% 적립 (통합 6만P 한도와 별도)
 // 한도는 전월 조건으로 결정: 전월 이용 100만원↑ + 결제계좌 잔액 조건(100만원↑ 15영업일 → 5천, 200만원↑ → 1만5천)
 // 잔액 조건 미충족이어도 전월 이용 200만원↑ → 5천, 300만원↑ → 1만5천
 export const SOLSOL_BALANCE = [
@@ -152,7 +152,7 @@ function computeSol(txs, s = {}, ctx = {}) {
     }
     const earned = Math.max(0, Math.min(raw, CAP - total));
     total += earned;
-    if (earned < raw) warn = `통합 한도(6만원) 도달로 ${num(raw - earned)}원 미적립`;
+    if (earned < raw) warn = `통합 한도(6만P) 도달로 ${num(raw - earned)}P 미적립`;
     // 담을수록 SOLSOL (별도 한도)
     let ss = 0;
     if (area === 'solsol') {
@@ -176,14 +176,14 @@ function computeSol(txs, s = {}, ctx = {}) {
       : `${SOL_LABEL[k]}: 이번 달 한도 소진 — 이 영역은 다른 카드로`;
   });
   return {
-    results, unit: '원', totalEarned: total + ssTotal,
+    results, unit: 'P', totalEarned: total + ssTotal,
     bars: [
-      { label: '통합 적립 한도', value: total, max: CAP, unit: '원' },
+      { label: '통합 적립 한도', value: total, max: CAP, unit: 'P' },
       ...SOL_SPECIAL.map((k) => ({ label: `${SOL_LABEL[k]} 영역`, value: spent[k], max: AREA_LIMIT, unit: '원' })),
       { label: '담을수록 SOLSOL (별도 한도)', value: ssTotal, max: ssCap, unit: 'P' },
     ],
     hints: [
-      remain > 0 ? `남은 적립 한도 ${num(remain)}원 (기본 1.5% 기준 약 ${won(remain / 0.015)})` : '이번 달 통합 적립 한도 도달',
+      remain > 0 ? `남은 적립 한도 ${num(remain)}P (기본 1.5% 기준 약 ${won(remain / 0.015)} 더 결제하면 한도 도달)` : '이번 달 통합 적립 한도 도달',
       ...areaHints,
       (alwaysMax
         ? `담을수록: 한도 ${num(ssCap)}P (전월 조건 항상 충족으로 계산)`
@@ -239,7 +239,7 @@ export const CARDS = [
     compute: computeHipoint,
   },
   {
-    id: 'shinhan_solplan', name: '쏠 플랜+', short: '쏠플랜+', unit: '원', color: '#0d9488',
+    id: 'shinhan_solplan', name: '쏠 플랜+', short: '쏠플랜+', unit: 'P', color: '#0d9488',
     defaultArea: 'general',
     areas: [
       {
@@ -286,7 +286,7 @@ export function rewardWon(card, earned, s) {
   return card.unit === '마일' ? earned * (Number(s.mileValue) || 0) : earned;
 }
 export function fmtReward(card, earned) {
-  return `${num(earned)}${card.unit === '원' ? '원' : card.unit}`;
+  return `${num(earned)}${card.unit}`;
 }
 
 // ── 실적 기간 ────────────────────────────────────────────────
