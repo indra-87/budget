@@ -16,6 +16,9 @@ export const DEFAULT_SETTINGS = {
     '본인991*': 'shinhan_solplan',
     '379183******320': 'samsung_andmileage',
   },
+  // 쏠 플랜+ 담을수록: 결제계좌 전월 잔액 조건 (월별로 바꾸면 solsolBalance['YYYY-MM']에 저장)
+  solsolBalanceDefault: 'none',
+  solsolBalance: {},
 };
 
 export const DEFAULT_MERCHANTS = [
@@ -98,11 +101,32 @@ const SOL_LABEL = { fuel: '주유', online: '온라인쇼핑', delivery: '배달
 // 누적이 30만원에 도달하거나 넘게 만드는 결제는 건 전체가 기본적립까지 제외되고,
 // 그 금액도 누적에 포함되므로 이후 같은 영역 결제는 계속 제외됩니다.
 // (예: 29만원 사용 후 9,000원 → 적립 / 10,000원 이상 → 제외)
-function computeSol(txs) {
-  const CAP = 60000, AREA_LIMIT = 300000;
+// 담을수록 SOLSOL: OTT·멤버십·통신요금 자동납부 100% 적립 (통합 6만원 한도와 별도)
+// 한도는 전월 조건으로 결정: 전월 이용 100만원↑ + 결제계좌 잔액 조건(100만원↑ 15영업일 → 5천, 200만원↑ → 1만5천)
+// 잔액 조건 미충족이어도 전월 이용 200만원↑ → 5천, 300만원↑ → 1만5천
+export const SOLSOL_BALANCE = [
+  ['none', '미충족 / 모름'],
+  ['1m', '일 잔액 100만원↑ 15영업일 이상'],
+  ['2m', '일 잔액 200만원↑ 15영업일 이상'],
+];
+export function solsolCap(prevSpend, balance) {
+  let cap = 0;
+  if (prevSpend >= 1000000) cap = balance === '2m' ? 15000 : balance === '1m' ? 5000 : 0;
+  if (prevSpend >= 3000000) cap = Math.max(cap, 15000);
+  else if (prevSpend >= 2000000) cap = Math.max(cap, 5000);
+  return cap;
+}
+export const solsolBalanceFor = (s, period) => s.solsolBalance?.[shiftPeriod(period, -1)] || s.solsolBalanceDefault || 'none';
+
+function computeSol(txs, s = {}, ctx = {}) {
+  const CAP = 60000, AREA_LIMIT = 300000, SOLSOL_MIN = 4900;
   const results = new Map();
   const spent = { fuel: 0, online: 0, delivery: 0 };
   let total = 0;
+  const prevSpend = ctx.prevSpend || 0;
+  const balance = ctx.period ? solsolBalanceFor(s, ctx.period) : (s.solsolBalanceDefault || 'none');
+  const ssCap = solsolCap(prevSpend, balance);
+  let ssTotal = 0, ssSpend = 0;
   for (const t of txs) {
     const a = Number(t.amount) || 0;
     const area = t.area || 'general';
@@ -124,7 +148,20 @@ function computeSol(txs) {
     const earned = Math.max(0, Math.min(raw, CAP - total));
     total += earned;
     if (earned < raw) warn = `통합 한도(6만원) 도달로 ${num(raw - earned)}원 미적립`;
-    results.set(t.id, { raw, earned, detail, warn });
+    // 담을수록 SOLSOL (별도 한도)
+    let ss = 0;
+    if (area === 'solsol') {
+      if (a < SOLSOL_MIN) {
+        warn = '담을수록: 건당 4,900원 미만은 제외';
+      } else {
+        ssSpend += a;
+        ss = Math.max(0, Math.min(a, ssCap - ssTotal));
+        ssTotal += ss;
+        detail += ` + 담을수록 ${num(ss)}P`;
+        if (ss < a) warn = ssCap === 0 ? '담을수록: 이번 달 한도 없음 (전월 조건 미충족)' : `담을수록 한도(${num(ssCap)}P) 도달로 ${num(a - ss)}P 미적립`;
+      }
+    }
+    results.set(t.id, { raw: raw + (area === 'solsol' && a >= SOLSOL_MIN ? a : 0), earned: earned + ss, detail, warn });
   }
   const remain = CAP - total;
   const areaHints = SOL_SPECIAL.map((k) => {
@@ -134,15 +171,19 @@ function computeSol(txs) {
       : `${SOL_LABEL[k]}: 이번 달 한도 소진 — 이 영역은 다른 카드로`;
   });
   return {
-    results, unit: '원', totalEarned: total,
+    results, unit: '원', totalEarned: total + ssTotal,
     bars: [
       { label: '통합 적립 한도', value: total, max: CAP, unit: '원' },
       ...SOL_SPECIAL.map((k) => ({ label: `${SOL_LABEL[k]} 영역`, value: spent[k], max: AREA_LIMIT, unit: '원' })),
+      { label: '담을수록 SOLSOL (별도 한도)', value: ssTotal, max: ssCap, unit: 'P' },
     ],
     hints: [
       remain > 0 ? `남은 적립 한도 ${num(remain)}원 (기본 1.5% 기준 약 ${won(remain / 0.015)})` : '이번 달 통합 적립 한도 도달',
       ...areaHints,
+      `담을수록: 전월 이용 ${won(prevSpend)} · 잔액 조건 ${SOLSOL_BALANCE.find(([k]) => k === balance)[1]} → 이번 달 한도 ${num(ssCap)}P`
+        + (ssCap > 0 ? ` · 남은 ${num(Math.max(0, ssCap - ssTotal))}P` : ''),
     ],
+    solsol: { cap: ssCap, earned: ssTotal, spend: ssSpend, prevSpend, balance },
   };
 }
 
@@ -194,6 +235,12 @@ export const CARDS = [
     id: 'shinhan_solplan', name: '쏠 플랜+', short: '쏠플랜+', unit: '원', color: '#0d9488',
     defaultArea: 'general',
     areas: [
+      {
+        key: 'solsol', label: '담을수록 (OTT·멤버십·통신 100%)',
+        keywords: ['넷플릭스', 'netflix', '유튜브프리미엄', 'youtube', '티빙', 'tving', '디즈니플러스', 'disney',
+          '네이버플러스', '네이버멤버십', '와우멤버십', '쿠팡와우', '로켓와우',
+          'SKT', 'SK텔레콤', '에스케이텔레콤', 'LG유플러스', '엘지유플러스', 'LGU+', '케이티', 'KT통신', 'KT요금', 'KT이동'],
+      },
       { key: 'delivery', label: '배달 5%', keywords: ['땡겨요', '요기요', '위대한상사', '배달의민족', '우아한형제들', '배민', '쿠팡이츠'] },
       { key: 'online', label: '온라인쇼핑 5%', keywords: ['쿠팡', 'coupang', 'SSG', '쓱닷컴', '에스에스지닷컴', '무신사', '29CM'] },
       { key: 'fuel', label: '주유 5%', keywords: ['SK주유', 'SK에너지', '에스케이에너지', 'SK엔크린', 'GS칼텍스', '지에스칼텍스', 'GS주유', '칼텍스', '주유소'] },
@@ -264,7 +311,16 @@ export function cardMonth(card, allTxs, period, s, excludeId) {
   const txs = allTxs
     .filter((t) => t.payment === card.id && t.id !== excludeId && periodKey(t.tx_date, s.cycleStartDay) === period)
     .sort(sortTx);
-  return { txs, summary: card.compute(txs, s) };
+  return { txs, summary: card.compute(txs, s, monthCtx(card, allTxs, period, s)) };
+}
+
+// 전월 이용금액 등 (쏠 플랜+ 담을수록 한도 계산용)
+export function monthCtx(card, allTxs, period, s) {
+  const prev = shiftPeriod(period, -1);
+  const prevSpend = allTxs
+    .filter((t) => t.payment === card.id && periodKey(t.tx_date, s.cycleStartDay) === prev)
+    .reduce((a, t) => a + (Number(t.amount) || 0), 0);
+  return { period, prevSpend };
 }
 
 // 아직 저장하지 않은 결제(draft)를 해당 카드로 했을 때의 예상 적립
@@ -273,7 +329,7 @@ export function simulate(card, allTxs, draft, s, excludeId) {
   const { txs } = cardMonth(card, allTxs, period, s, excludeId);
   const sim = { ...draft, id: '__sim__', payment: card.id, created_at: '~', area: draft.area || suggestArea(card, draft.merchant) };
   const list = [...txs.filter((t) => t.tx_date <= sim.tx_date), sim, ...txs.filter((t) => t.tx_date > sim.tx_date)];
-  const summary = card.compute(list, s);
+  const summary = card.compute(list, s, monthCtx(card, allTxs, period, s));
   const r = summary.results.get('__sim__');
   return { ...r, area: sim.area, valueWon: rewardWon(card, r.earned, s), summary };
 }

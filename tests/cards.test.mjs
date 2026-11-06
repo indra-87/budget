@@ -1,6 +1,6 @@
 // 실행: node tests/cards.test.mjs
 import assert from 'node:assert/strict';
-import { CARDS, cardById, suggestArea, DEFAULT_SETTINGS as S, simulate, periodKey } from '../js/cards.js';
+import { CARDS, cardById, suggestArea, DEFAULT_SETTINGS as S, simulate, periodKey, solsolCap, cardMonth } from '../js/cards.js';
 
 let n = 0;
 const tx = (amount, area, extra = {}) => ({ id: `t${++n}`, tx_date: '2026-11-0' + ((n % 9) + 1), amount, area, ...extra });
@@ -77,6 +77,37 @@ ok('앤마일리지 추가적립 한도 2,000마일 초과 시 기본만', () =>
   const a = tx(1990000, 'extra'), b = tx(50000, 'extra'); // 추가 1,990 → 남은 10
   const r = run('samsung_andmileage', [a, b]);
   assert.equal(r.results.get(b.id).earned, 50 + 10);
+});
+
+// ── 담을수록 SOLSOL ──
+ok('담을수록 한도 조건', () => {
+  assert.equal(solsolCap(900000, '2m'), 0);
+  assert.equal(solsolCap(1000000, 'none'), 0);
+  assert.equal(solsolCap(1000000, '1m'), 5000);
+  assert.equal(solsolCap(1000000, '2m'), 15000);
+  assert.equal(solsolCap(2000000, 'none'), 5000);
+  assert.equal(solsolCap(2500000, '2m'), 15000);
+  assert.equal(solsolCap(3000000, 'none'), 15000);
+});
+ok('담을수록 적립: 100% + 기본 1.5%, 별도 한도, 4,900원 미만 제외', () => {
+  assert.equal(suggestArea(sol, '넷플릭스서비시스코리아'), 'solsol');
+  assert.equal(suggestArea(sol, 'SKT 통신요금'), 'solsol');
+  const all = [
+    { id: 'p1', tx_date: '2026-10-10', amount: 1200000, payment: 'shinhan_solplan', area: 'general' },
+    { id: 'n', tx_date: '2026-11-03', amount: 17000, payment: 'shinhan_solplan', area: 'solsol' },
+    { id: 'k', tx_date: '2026-11-10', amount: 4500, payment: 'shinhan_solplan', area: 'solsol' },
+  ];
+  const s1 = { ...S, solsolBalance: { '2026-10': '1m' } };
+  const r = cardMonth(sol, all, '2026-11', s1).summary;
+  assert.equal(r.results.get('n').earned, 255 + 5000);   // 기본 1.5% + 한도 5천까지
+  assert.equal(r.results.get('k').earned, 67);           // 4,900원 미만 → 기본만
+  assert.equal(r.solsol.cap, 5000);
+  const r2 = cardMonth(sol, all, '2026-11', { ...S, solsolBalance: { '2026-10': '2m' } }).summary;
+  assert.equal(r2.results.get('n').earned, 255 + 15000);
+  const r3 = cardMonth(sol, all, '2026-11', S).summary;   // 잔액 조건 모름 → 한도 0
+  assert.equal(r3.results.get('n').earned, 255);
+  // 통합 6만원 한도와 별개
+  assert.equal(r2.bars[0].value, 255 + 67);
 });
 
 // ── 시뮬레이션 / 기간 ──

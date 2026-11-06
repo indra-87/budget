@@ -129,6 +129,14 @@
             <label class="span2">실적 기간 시작일
               <select name="cycleStartDay"></select>
             </label>
+            <label class="span2">쏠 플랜+ 담을수록: 평소 결제계좌 잔액 조건
+              <select name="solsolBalanceDefault">
+                <option value="none">미충족 / 모름</option>
+                <option value="1m">일 잔액 100만원↑ 15영업일 이상</option>
+                <option value="2m">일 잔액 200만원↑ 15영업일 이상</option>
+              </select>
+              <span class="hint">달마다 다르면 실적 탭에서 그 달만 바꿀 수 있어요.</span>
+            </label>
             <label class="span2">자주 쓰는 사용처 (쉼표로 구분)
               <input name="favoriteMerchants" />
             </label>

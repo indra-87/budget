@@ -1,6 +1,6 @@
 import { store } from './store.js';
 import {
-  CARDS, OTHER_METHODS, LEGACY_METHOD, DEFAULT_MERCHANTS, DEFAULT_SETTINGS, cardById, payName, areaLabel,
+  CARDS, OTHER_METHODS, LEGACY_METHOD, DEFAULT_MERCHANTS, SOLSOL_BALANCE, solsolBalanceFor, DEFAULT_SETTINGS, cardById, payName, areaLabel,
   suggestArea, simulate, cardMonth, rewardIndex, periodKey, shiftPeriod, periodLabel,
   fmtReward, won, num, norm,
 } from './cards.js';
@@ -439,6 +439,7 @@ function renderCards() {
       <div class="big">${fmtReward(card, summary.totalEarned)}${card.unit === '마일' ? ` <span class="hint">≈ ${won(summary.totalEarned * s.mileValue)}</span>` : ''}</div>
       ${bars}
       <ul class="hints">${summary.hints.map((h) => `<li>${esc(h)}</li>`).join('')}</ul>
+      ${summary.solsol ? solsolPicker(p, s) : ''}
       ${txs.length ? `<details><summary>영역별 · 건별 상세</summary>
         <table><tbody>${byArea}</tbody></table>
         <table><thead><tr><th>날짜</th><th>내역</th><th class="r">금액</th><th class="r">적립</th></tr></thead><tbody>${detail}</tbody></table>
@@ -450,6 +451,23 @@ function renderCards() {
     return list.length ? `<tr><td>${esc(m)}</td><td class="r">${list.length}건</td><td class="r">${won(list.reduce((x, t) => x + Number(t.amount), 0))}</td></tr>` : '';
   }).join('');
   $('#cardBoards').innerHTML = boards + (others ? `<div class="panel"><h3>기타 결제수단</h3><table><tbody>${others}</tbody></table></div>` : '');
+  $('#cardBoards').querySelectorAll('[data-solsol]').forEach((el) => el.addEventListener('change', onSolsolChange));
+}
+
+// 쏠 플랜+ 담을수록: 전월 결제계좌 잔액 조건 고르기
+function solsolPicker(period, s) {
+  const prev = shiftPeriod(period, -1);
+  const cur = solsolBalanceFor(s, period);
+  return `<label class="solsol">${esc(periodLabel(prev, s.cycleStartDay))} 결제계좌 잔액 조건 (담을수록)
+    <select data-solsol="${prev}">${SOLSOL_BALANCE.map(([k, l]) => `<option value="${k}" ${k === cur ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select>
+    <span class="hint">신한 슈퍼SOL 앱에서 확인한 전월 잔액 조건을 고르세요. 전월 카드 이용금액은 앱에 입력·가져온 내역으로 계산해요.</span></label>`;
+}
+
+async function onSolsolChange(e) {
+  const prev = e.target.dataset.solsol;
+  state.settings = { ...state.settings, solsolBalance: { ...(state.settings.solsolBalance || {}), [prev]: e.target.value } };
+  try { await store.saveSettings(state.settings); } catch (err) { toast(`저장 실패: ${err.message}`); }
+  renderAll();
 }
 
 // ── 설정 탭 ───────────────────────────────────────────────────
@@ -466,6 +484,7 @@ function bindSettings() {
       mileValue: parseFloat(f.mileValue.value) || 0,
       cycleStartDay: Number(f.cycleStartDay.value) || 1,
       favoriteMerchants: f.favoriteMerchants.value.split(',').map((x) => x.trim()).filter(Boolean),
+      solsolBalanceDefault: f.solsolBalanceDefault.value,
     };
     try {
       await store.saveSettings(next);
@@ -484,6 +503,7 @@ function renderSettings() {
   f.mileValue.value = s.mileValue;
   f.cycleStartDay.value = s.cycleStartDay;
   f.favoriteMerchants.value = (s.favoriteMerchants || []).join(', ');
+  f.solsolBalanceDefault.value = s.solsolBalanceDefault || 'none';
 }
 
 // ── 명세서 가져오기 탭 ────────────────────────────────────────
