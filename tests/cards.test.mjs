@@ -89,7 +89,7 @@ ok('담을수록 한도 조건', () => {
   assert.equal(solsolCap(2500000, '2m'), 15000);
   assert.equal(solsolCap(3000000, 'none'), 15000);
 });
-ok('담을수록 적립: 100% + 기본 1.5%, 별도 한도, 4,900원 미만 제외', () => {
+ok('담을수록 적립: 100%(기본적립 없음), 별도 한도, 4,900원 미만 제외', () => {
   assert.equal(suggestArea(sol, '넷플릭스서비시스코리아'), 'solsol');
   assert.equal(suggestArea(sol, 'SKT 통신요금'), 'solsol');
   const all = [
@@ -97,17 +97,20 @@ ok('담을수록 적립: 100% + 기본 1.5%, 별도 한도, 4,900원 미만 제�
     { id: 'n', tx_date: '2026-11-03', amount: 17000, payment: 'shinhan_solplan', area: 'solsol' },
     { id: 'k', tx_date: '2026-11-10', amount: 4500, payment: 'shinhan_solplan', area: 'solsol' },
   ];
-  const s1 = { ...S, solsolBalance: { '2026-10': '1m' } };
-  const r = cardMonth(sol, all, '2026-11', s1).summary;
-  assert.equal(r.results.get('n').earned, 255 + 5000);   // 기본 1.5% + 한도 5천까지
-  assert.equal(r.results.get('k').earned, 67);           // 4,900원 미만 → 기본만
+  const M = { ...S, solsolAlwaysMax: false };
+  const r = cardMonth(sol, all, '2026-11', { ...M, solsolBalance: { '2026-10': '1m' } }).summary;
+  assert.equal(r.results.get('n').earned, 5000);         // 기본적립 없이 한도 5천까지
+  assert.equal(r.results.get('k').earned, 67);           // 4,900원 미만 → 기본 1.5%만
   assert.equal(r.solsol.cap, 5000);
-  const r2 = cardMonth(sol, all, '2026-11', { ...S, solsolBalance: { '2026-10': '2m' } }).summary;
-  assert.equal(r2.results.get('n').earned, 255 + 15000);
-  const r3 = cardMonth(sol, all, '2026-11', S).summary;   // 잔액 조건 모름 → 한도 0
-  assert.equal(r3.results.get('n').earned, 255);
+  const r2 = cardMonth(sol, all, '2026-11', { ...M, solsolBalance: { '2026-10': '2m' } }).summary;
+  assert.equal(r2.results.get('n').earned, 15000);
+  const r3 = cardMonth(sol, all, '2026-11', { ...M, solsolBalanceDefault: 'none' }).summary;
+  assert.equal(r3.results.get('n').earned, 0);
   // 통합 6만원 한도와 별개
-  assert.equal(r2.bars[0].value, 255 + 67);
+  assert.equal(r2.bars[0].value, 67);
+  // 기본 설정: 항상 최대 한도 1만5천 (전월 데이터 없어도)
+  const r4 = cardMonth(sol, all.slice(1), '2026-11', S).summary;
+  assert.equal(r4.results.get('n').earned, 15000);
 });
 
 // ── 시뮬레이션 / 기간 ──

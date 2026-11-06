@@ -163,3 +163,5 @@ td.r, th.r { text-align: right; white-space: nowrap; }
 .cardmap { flex-direction: row; align-items: center; justify-content: space-between; gap: 10px; margin-top: 6px; color: var(--text); }
 .cardmap select { width: auto; min-width: 150px; }
 .solsol { margin-top: 12px; padding: 10px; background: var(--bg); border-radius: 10px; color: var(--text); }
+label.check { flex-direction: row; align-items: center; gap: 8px; color: var(--text); }
+label.check input { width: 20px; height: 20px; }

@@ -17,7 +17,8 @@ export const DEFAULT_SETTINGS = {
     '379183******320': 'samsung_andmileage',
   },
   // 쏠 플랜+ 담을수록: 결제계좌 전월 잔액 조건 (월별로 바꾸면 solsolBalance['YYYY-MM']에 저장)
-  solsolBalanceDefault: 'none',
+  solsolAlwaysMax: true,        // 전월 실적·잔액 조건을 항상 채운다고 보고 1만5천P로 계산
+  solsolBalanceDefault: '2m',
   solsolBalance: {},
 };
 
@@ -125,7 +126,8 @@ function computeSol(txs, s = {}, ctx = {}) {
   let total = 0;
   const prevSpend = ctx.prevSpend || 0;
   const balance = ctx.period ? solsolBalanceFor(s, ctx.period) : (s.solsolBalanceDefault || 'none');
-  const ssCap = solsolCap(prevSpend, balance);
+  const alwaysMax = s.solsolAlwaysMax !== false;
+  const ssCap = alwaysMax ? 15000 : solsolCap(prevSpend, balance);
   let ssTotal = 0, ssSpend = 0;
   for (const t of txs) {
     const a = Number(t.amount) || 0;
@@ -141,6 +143,9 @@ function computeSol(txs, s = {}, ctx = {}) {
         warn = `${SOL_LABEL[area]} 영역 30만원 도달 — 이 결제는 기본적립까지 전액 제외`;
       }
       spent[area] += a;
+    } else if (area === 'solsol' && a >= SOLSOL_MIN) {
+      raw = 0;                       // 담을수록 대상은 기본적립 없이 100%만
+      detail = '담을수록 100%';
     } else {
       raw = floor(a * 0.015);
       detail = `${won(a)} × 1.5%`;
@@ -157,7 +162,7 @@ function computeSol(txs, s = {}, ctx = {}) {
         ssSpend += a;
         ss = Math.max(0, Math.min(a, ssCap - ssTotal));
         ssTotal += ss;
-        detail += ` + 담을수록 ${num(ss)}P`;
+        detail = `담을수록 ${won(a)} × 100%`;
         if (ss < a) warn = ssCap === 0 ? '담을수록: 이번 달 한도 없음 (전월 조건 미충족)' : `담을수록 한도(${num(ssCap)}P) 도달로 ${num(a - ss)}P 미적립`;
       }
     }
@@ -180,10 +185,12 @@ function computeSol(txs, s = {}, ctx = {}) {
     hints: [
       remain > 0 ? `남은 적립 한도 ${num(remain)}원 (기본 1.5% 기준 약 ${won(remain / 0.015)})` : '이번 달 통합 적립 한도 도달',
       ...areaHints,
-      `담을수록: 전월 이용 ${won(prevSpend)} · 잔액 조건 ${SOLSOL_BALANCE.find(([k]) => k === balance)[1]} → 이번 달 한도 ${num(ssCap)}P`
-        + (ssCap > 0 ? ` · 남은 ${num(Math.max(0, ssCap - ssTotal))}P` : ''),
+      (alwaysMax
+        ? `담을수록: 한도 ${num(ssCap)}P (전월 조건 항상 충족으로 계산)`
+        : `담을수록: 전월 이용 ${won(prevSpend)} · 잔액 조건 ${SOLSOL_BALANCE.find(([k]) => k === balance)[1]} → 이번 달 한도 ${num(ssCap)}P`)
+        + (ssCap > 0 ? ` · 남은 ${num(Math.max(0, ssCap - ssTotal))}P (대상 결제 약 ${won(Math.max(0, ssCap - ssTotal))} 더 가능)` : ''),
     ],
-    solsol: { cap: ssCap, earned: ssTotal, spend: ssSpend, prevSpend, balance },
+    solsol: { cap: ssCap, earned: ssTotal, spend: ssSpend, prevSpend, balance, alwaysMax },
   };
 }
 

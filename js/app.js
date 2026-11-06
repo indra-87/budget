@@ -439,7 +439,7 @@ function renderCards() {
       <div class="big">${fmtReward(card, summary.totalEarned)}${card.unit === '마일' ? ` <span class="hint">≈ ${won(summary.totalEarned * s.mileValue)}</span>` : ''}</div>
       ${bars}
       <ul class="hints">${summary.hints.map((h) => `<li>${esc(h)}</li>`).join('')}</ul>
-      ${summary.solsol ? solsolPicker(p, s) : ''}
+      ${summary.solsol && !summary.solsol.alwaysMax ? solsolPicker(p, s) : ''}
       ${txs.length ? `<details><summary>영역별 · 건별 상세</summary>
         <table><tbody>${byArea}</tbody></table>
         <table><thead><tr><th>날짜</th><th>내역</th><th class="r">금액</th><th class="r">적립</th></tr></thead><tbody>${detail}</tbody></table>
@@ -485,6 +485,7 @@ function bindSettings() {
       cycleStartDay: Number(f.cycleStartDay.value) || 1,
       favoriteMerchants: f.favoriteMerchants.value.split(',').map((x) => x.trim()).filter(Boolean),
       solsolBalanceDefault: f.solsolBalanceDefault.value,
+      solsolAlwaysMax: f.solsolAlwaysMax.checked,
     };
     try {
       await store.saveSettings(next);
@@ -503,7 +504,8 @@ function renderSettings() {
   f.mileValue.value = s.mileValue;
   f.cycleStartDay.value = s.cycleStartDay;
   f.favoriteMerchants.value = (s.favoriteMerchants || []).join(', ');
-  f.solsolBalanceDefault.value = s.solsolBalanceDefault || 'none';
+  f.solsolBalanceDefault.value = s.solsolBalanceDefault || '2m';
+  f.solsolAlwaysMax.checked = s.solsolAlwaysMax !== false;
 }
 
 // ── 명세서 가져오기 탭 ────────────────────────────────────────
