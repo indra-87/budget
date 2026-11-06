@@ -1,10 +1,10 @@
-import { store } from './store.js';
+import { store } from './store.js?v=20261106135359';
 import {
   CARDS, OTHER_METHODS, LEGACY_METHOD, DISCOUNT_METHOD, DISCOUNT_RATES, discounted, DEFAULT_MERCHANTS, SOLSOL_BALANCE, solsolBalanceFor, DEFAULT_SETTINGS, cardById, payName, areaLabel,
   suggestArea, simulate, cardMonth, rewardIndex, periodKey, shiftPeriod, periodLabel,
   fmtReward, won, num, norm,
-} from './cards.js';
-import { findHeader, detectColumns, extractRows, classify, buildCommit } from './importer.js';
+} from './cards.js?v=20261106135359';
+import { findHeader, detectColumns, extractRows, classify, buildCommit } from './importer.js?v=20261106135359';
 
 const $ = (s, el = document) => el.querySelector(s);
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -532,6 +532,8 @@ function bindSettings() {
 }
 
 function renderSettings() {
+  const v = new URL(import.meta.url).searchParams.get('v') || '개발';
+  $('#appVersion').textContent = `앱 버전 ${v.replace(/^(\d{4})(\d{2})(\d{2})(\d{2})(\d{2}).*/, '$1.$2.$3 $4:$5')}`;
   const f = $('#settingsForm').elements;
   const s = state.settings;
   f.fuelPrice.value = s.fuelPrice;

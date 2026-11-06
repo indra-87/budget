@@ -1,5 +1,5 @@
 // 데이터 계층: Supabase 또는 (설정이 비었을 때) 브라우저 localStorage 데모 모드
-import { SUPABASE_URL, SUPABASE_ANON_KEY } from './config.js';
+import { SUPABASE_URL, SUPABASE_ANON_KEY } from './config.js?v=20261106135359';
 
 const isDemo = !SUPABASE_URL || !SUPABASE_ANON_KEY;
 let sb = null;

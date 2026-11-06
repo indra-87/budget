@@ -4,7 +4,7 @@
 //  2) 행을 정리한 뒤
 //  3) 이미 저장된 내역과 비교해 신규 / 중복 의심 / 이미 가져옴 / 취소 로 분류
 // ─────────────────────────────────────────────────────────────
-import { norm, suggestArea, cardById, LEGACY_METHOD, DISCOUNT_METHOD, discounted } from './cards.js';
+import { norm, suggestArea, cardById, LEGACY_METHOD, DISCOUNT_METHOD, discounted } from './cards.js?v=20261106135359';
 
 // 할인 결제(순천사랑)는 명세서 금액 = 결제액(face_amount)
 const faceOf = (t) => Number(t.face_amount ?? t.amount);
