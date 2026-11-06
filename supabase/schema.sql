@@ -54,3 +54,10 @@ create policy "gb own settings" on public.gb_settings
 
 revoke all on public.gb_transactions, public.gb_settings from anon;
 revoke execute on function public.gb_touch_updated_at() from anon, authenticated, public;
+
+-- 4) 카드 명세서 가져오기용 (2026-11 추가)
+alter table public.gb_transactions
+  add column if not exists source text not null default 'manual',  -- manual | import | legacy
+  add column if not exists import_key text;                        -- 명세서 행 식별키
+create index if not exists gb_transactions_import_key_idx
+  on public.gb_transactions (user_id, import_key) where import_key is not null;

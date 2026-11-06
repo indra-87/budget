@@ -147,3 +147,16 @@ td.r, th.r { text-align: right; white-space: nowrap; }
   .filters { grid-template-columns: 2fr 1fr 1fr auto; }
   .filters input[type=search], .filters .ghost { grid-column: auto; }
 }
+
+/* 가져오기 */
+.map { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); }
+.imp { display: grid; grid-template-columns: auto 1fr auto; gap: 2px 10px; align-items: start; padding: 10px 2px; border-bottom: 1px solid var(--line); }
+.imp input[type=checkbox] { width: 20px; height: 20px; margin-top: 2px; }
+.imp .t1 { font-weight: 600; word-break: break-all; }
+.imp .amt { font-weight: 700; white-space: nowrap; }
+.imp .sub { grid-column: 2 / 4; font-size: 12px; color: var(--muted); }
+.imp .sub select { font-size: 13px; padding: 4px 8px; width: auto; margin-top: 4px; }
+.imp .match { grid-column: 2 / 4; font-size: 12px; background: var(--warn-soft); color: var(--text); border-radius: 8px; padding: 6px 8px; }
+.imp.off .t1, .imp.off .amt { color: var(--muted); }
+.badge.bad { background: var(--bad-soft); color: var(--bad); }
+#impFilter { margin: 8px 0; }

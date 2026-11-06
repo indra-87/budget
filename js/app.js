@@ -1,9 +1,10 @@
 import { store } from './store.js';
 import {
-  CARDS, OTHER_METHODS, DEFAULT_MERCHANTS, DEFAULT_SETTINGS, cardById, payName, areaLabel,
+  CARDS, OTHER_METHODS, LEGACY_METHOD, DEFAULT_MERCHANTS, DEFAULT_SETTINGS, cardById, payName, areaLabel,
   suggestArea, simulate, cardMonth, rewardIndex, periodKey, shiftPeriod, periodLabel,
   fmtReward, won, num, norm,
 } from './cards.js';
+import { findHeader, detectColumns, extractRows, classify, buildCommit } from './importer.js';
 
 const $ = (s, el = document) => el.querySelector(s);
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -26,7 +27,7 @@ const state = {
 
 // ── 시작 ──────────────────────────────────────────────────────
 async function init() {
-  bindTabs(); bindForm(); bindHistory(); bindCards(); bindSettings(); bindLogin();
+  bindTabs(); bindForm(); bindHistory(); bindCards(); bindSettings(); bindLogin(); bindImport();
   if (store.isDemo) {
     $('#modeBadge').hidden = false;
     return showApp();
@@ -349,7 +350,7 @@ function filteredTxs() {
 }
 
 function renderHistory() {
-  const payOpts = [['', '전체 결제수단'], ...CARDS.map((c) => [c.id, c.name]), ...OTHER_METHODS.map((m) => [m, m])];
+  const payOpts = [['', '전체 결제수단'], ...CARDS.map((c) => [c.id, c.name]), ...[...OTHER_METHODS, LEGACY_METHOD].map((m) => [m, m])];
   const curPay = $('#hpay').value;
   $('#hpay').innerHTML = payOpts.map(([v, l]) => `<option value="${esc(v)}">${esc(l)}</option>`).join('');
   $('#hpay').value = curPay;
@@ -443,7 +444,7 @@ function renderCards() {
       </details>` : ''}
     </div>`;
   }).join('');
-  const others = OTHER_METHODS.map((m) => {
+  const others = [...OTHER_METHODS, LEGACY_METHOD].map((m) => {
     const list = state.txs.filter((t) => t.payment === m && periodKey(t.tx_date, s.cycleStartDay) === p);
     return list.length ? `<tr><td>${esc(m)}</td><td class="r">${list.length}건</td><td class="r">${won(list.reduce((x, t) => x + Number(t.amount), 0))}</td></tr>` : '';
   }).join('');
@@ -482,6 +483,173 @@ function renderSettings() {
   f.mileValue.value = s.mileValue;
   f.cycleStartDay.value = s.cycleStartDay;
   f.favoriteMerchants.value = (s.favoriteMerchants || []).join(', ');
+}
+
+// ── 명세서 가져오기 탭 ────────────────────────────────────────
+const imp = { table: null, headerRow: 0, cols: null, items: [], filter: 'all', fileName: '' };
+let XLSX = null;
+
+function bindImport() {
+  const opts = [...CARDS.map((c) => [c.id, c.name]), ['체크카드', '체크카드'], ['기타', '기타']];
+  $('#impPay').innerHTML = opts.map(([v, l]) => `<option value="${esc(v)}">${esc(l)}</option>`).join('');
+  $('#impPay').addEventListener('change', runClassify);
+  $('#impFile').addEventListener('change', onImportFile);
+  $('#impConfirm').addEventListener('click', onImportConfirm);
+}
+
+async function readTable(file) {
+  if (!XLSX) XLSX = await import('https://cdn.jsdelivr.net/npm/xlsx@0.18.5/+esm');
+  const buf = await file.arrayBuffer();
+  let wb;
+  if (/\.csv$/i.test(file.name)) {
+    let text;
+    try { text = new TextDecoder('utf-8', { fatal: true }).decode(buf); }
+    catch { text = new TextDecoder('euc-kr').decode(buf); } // 카드사 CSV는 EUC-KR인 경우가 많음
+    wb = XLSX.read(text.replace(/^﻿/, ''), { type: 'string', cellDates: true });
+  } else {
+    wb = XLSX.read(buf, { type: 'array', cellDates: true });
+  }
+  // 날짜·금액 열이 있는 첫 시트
+  for (const name of wb.SheetNames) {
+    const t = XLSX.utils.sheet_to_json(wb.Sheets[name], { header: 1, raw: true, defval: '' });
+    const found = findHeader(t);
+    if (found.cols.date >= 0 && found.cols.amount >= 0) return t;
+  }
+  return XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, raw: true, defval: '' });
+}
+
+async function onImportFile(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  try {
+    imp.table = await readTable(file);
+    imp.fileName = file.name;
+    const { headerRow, cols } = findHeader(imp.table);
+    imp.headerRow = headerRow;
+    imp.cols = cols;
+    renderImportMap();
+    runClassify();
+  } catch (err) {
+    toast(`파일을 읽지 못했어요: ${err.message}`);
+  }
+}
+
+function renderImportMap() {
+  const headers = imp.table[imp.headerRow] || [];
+  const opt = (sel) => `<option value="-1">(없음)</option>` + headers.map((hd, i) =>
+    `<option value="${i}" ${i === sel ? 'selected' : ''}>${esc(String(hd || `${i + 1}열`))}</option>`).join('');
+  const rowOpts = imp.table.slice(0, 40).map((r, i) =>
+    `<option value="${i}" ${i === imp.headerRow ? 'selected' : ''}>${i + 1}행: ${esc(r.filter((x) => x !== '').slice(0, 4).join(' | ').slice(0, 40))}</option>`).join('');
+  const box = $('#impMap');
+  box.hidden = false;
+  box.innerHTML = `
+    <label class="span2">머리글 행<select data-k="headerRow">${rowOpts}</select></label>
+    <label>날짜 열<select data-k="date">${opt(imp.cols.date)}</select></label>
+    <label>금액 열<select data-k="amount">${opt(imp.cols.amount)}</select></label>
+    <label>가맹점 열<select data-k="merchant">${opt(imp.cols.merchant)}</select></label>
+    <label>승인번호 열 (선택)<select data-k="approval">${opt(imp.cols.approval)}</select></label>
+    <label class="span2">취소 구분 열 (선택)<select data-k="status">${opt(imp.cols.status)}</select></label>
+    <p class="hint span2">자동으로 찾은 열이에요. 틀렸으면 바꿔주세요.</p>`;
+  box.querySelectorAll('select').forEach((s) => s.addEventListener('change', () => {
+    const k = s.dataset.k;
+    if (k === 'headerRow') {
+      imp.headerRow = Number(s.value);
+      imp.cols = detectColumns(imp.table[imp.headerRow] || []);
+      renderImportMap();
+    } else {
+      imp.cols = { ...imp.cols, [k]: Number(s.value) };
+    }
+    runClassify();
+  }));
+}
+
+function runClassify() {
+  if (!imp.table) return;
+  const pay = $('#impPay').value;
+  const c = imp.cols;
+  if (c.date < 0 || c.amount < 0) {
+    $('#impResult').hidden = false;
+    $('#impSummary').innerHTML = '날짜 열과 금액 열을 지정해 주세요.';
+    $('#impList').innerHTML = '';
+    return;
+  }
+  const rows = extractRows(imp.table, imp.headerRow, c, new Date());
+  imp.items = classify(rows, state.txs, pay);
+  imp.filter = 'all';
+  renderImport();
+}
+
+const ST = {
+  new: ['신규', 'good'], dup: ['중복 의심', 'warn'], imported: ['이미 가져옴', 'manual'],
+  cancel: ['취소', 'bad'], cancelled: ['취소된 결제', 'bad'],
+};
+
+function renderImport() {
+  const pay = $('#impPay').value;
+  const card = cardById(pay);
+  const items = imp.items;
+  const count = (s) => items.filter((x) => x.status === s).length;
+  const picked = items.filter((x) => x.checked);
+  $('#impResult').hidden = false;
+  $('#impSummary').innerHTML = `${esc(imp.fileName)} · ${items.length}건 — 신규 <b>${count('new')}</b> · 중복 의심 <b>${count('dup')}</b> · 이미 가져옴 ${count('imported')} · 취소 ${count('cancel') + count('cancelled')}<br>`
+    + `가져올 건: <b>${picked.length}건 ${won(picked.reduce((a, x) => a + x.amount, 0))}</b>`
+    + (count('dup') ? ` · 중복으로 처리할 ${items.filter((x) => x.status === 'dup' && !x.checked).length}건은 기존 내역에 이 카드 정보가 연결돼요` : '');
+
+  const filters = [['all', '전체'], ['new', '신규'], ['dup', '중복 의심'], ['cancel', '취소'], ['imported', '이미 가져옴']];
+  $('#impFilter').innerHTML = filters.map(([k, l]) => `<button class="chip ${imp.filter === k ? 'on' : ''}" data-f="${k}">${l}</button>`).join('');
+  $('#impFilter').querySelectorAll('[data-f]').forEach((b) => b.addEventListener('click', () => { imp.filter = b.dataset.f; renderImport(); }));
+
+  const shown = items.filter((x) => imp.filter === 'all' || x.status === imp.filter || (imp.filter === 'cancel' && x.status === 'cancelled'));
+  $('#impList').innerHTML = shown.length ? shown.map((it) => {
+    const idx = items.indexOf(it);
+    const [label, cls] = ST[it.status];
+    const areaSel = card && it.checked
+      ? `<select data-area="${idx}">${card.areas.map((a) => `<option value="${a.key}" ${a.key === it.area ? 'selected' : ''}>${esc(a.label)}</option>`).join('')}</select>` : '';
+    const match = it.matches.length
+      ? `<div class="match">${it.checked ? '체크 해제하면 아래 기존 내역과 같은 결제로 처리' : '↔ 이미 입력한 내역'}${it.matches.length > 1 ? ` (${it.matches.length}건 합계)` : ''}:<br>${it.matches.map((t) =>
+          `${t.tx_date} · ${esc(t.merchant || '-')} · ${esc(t.item)} · <b>${won(t.amount)}</b> (${esc(payName(t.payment))})`).join('<br>')}</div>` : '';
+    const pair = it.pair ? ` · ${it.status === 'cancel' ? '원거래' : '취소건'} ${it.pair}행` : '';
+    const note = it.status === 'cancel' && !it.pair ? ' · 원거래가 이미 저장돼 있다면 내역 탭에서 직접 삭제하세요' : '';
+    return `<div class="imp ${it.checked ? '' : 'off'}">
+      <input type="checkbox" data-chk="${idx}" ${it.checked ? 'checked' : ''} ${['imported', 'cancel'].includes(it.status) ? 'disabled' : ''} />
+      <span class="t1">${esc(it.merchantRaw || '(가맹점 없음)')}</span><span class="amt">${it.cancel ? '-' : ''}${won(it.amount)}</span>
+      <div class="sub">${it.date} · <span class="badge ${cls}">${label}</span>${it.merchant && it.merchant !== it.merchantRaw ? ` · 사용처: ${esc(it.merchant)}` : ''}${pair}${note}${areaSel ? '<br>' + areaSel : ''}</div>
+      ${match}
+    </div>`;
+  }).join('') : '<div class="empty-msg">해당하는 행이 없어요</div>';
+
+  $('#impList').querySelectorAll('[data-chk]').forEach((el) => el.addEventListener('change', () => {
+    items[el.dataset.chk].checked = el.checked;
+    renderImport();
+  }));
+  $('#impList').querySelectorAll('[data-area]').forEach((el) => el.addEventListener('change', () => {
+    items[el.dataset.area].area = el.value;
+  }));
+  const links = items.filter((x) => x.status === 'dup' && !x.checked).length;
+  $('#impConfirm').textContent = `${picked.length}건 가져오기${links ? ` + 중복 ${links}건 연결` : ''}`;
+  $('#impConfirm').disabled = !picked.length && !links;
+}
+
+async function onImportConfirm() {
+  const pay = $('#impPay').value;
+  const { inserts, links } = buildCommit(imp.items, pay);
+  if (!inserts.length && !links.length) return;
+  const btn = $('#impConfirm');
+  btn.disabled = true;
+  try {
+    const rows = await store.insertMany(inserts);
+    const updated = [];
+    for (const l of links) updated.push(await store.update(l.id, l.patch));
+    const byId = new Map(updated.map((r) => [r.id, r]));
+    state.txs = [...rows, ...state.txs.map((t) => byId.get(t.id) || t)];
+    toast(`${rows.length}건 가져오고 ${updated.length}건 연결했어요`);
+    renderAll();
+    runClassify(); // 같은 파일 기준으로 다시 분류 → 모두 '이미 가져옴'으로 표시됨
+  } catch (err) {
+    toast(`가져오기 실패: ${err.message}`);
+  } finally {
+    btn.disabled = false;
+  }
 }
 
 init();

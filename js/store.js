@@ -8,7 +8,7 @@ if (!isDemo) {
   sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 }
 
-const COLS = 'id,tx_date,item,amount,payment,merchant,area,liters,note,created_at';
+const COLS = 'id,tx_date,item,amount,payment,merchant,area,liters,note,source,import_key,created_at';
 const LS_TX = 'gagyebu.demo.transactions';
 const LS_SET = 'gagyebu.demo.settings';
 const lsGet = (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch { return d; } };
@@ -50,6 +50,20 @@ export const store = {
       return row;
     }
     return fix(check(await sb.from('gb_transactions').insert(rec).select(COLS).single()));
+  },
+  async insertMany(recs) {
+    if (!recs.length) return [];
+    if (isDemo) {
+      const now = Date.now();
+      const rows = recs.map((r, i) => ({ ...r, id: crypto.randomUUID(), created_at: new Date(now + i).toISOString() }));
+      lsSet(LS_TX, [...rows, ...lsGet(LS_TX, [])]);
+      return rows;
+    }
+    const out = [];
+    for (let i = 0; i < recs.length; i += 200) {
+      out.push(...check(await sb.from('gb_transactions').insert(recs.slice(i, i + 200)).select(COLS)));
+    }
+    return out.map(fix);
   },
   async update(id, rec) {
     if (isDemo) {

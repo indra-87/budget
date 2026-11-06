@@ -29,7 +29,8 @@
     <nav class="tabs">
       <button data-tab="input" class="active">입력</button>
       <button data-tab="history">내역</button>
-      <button data-tab="cards">카드 실적</button>
+      <button data-tab="cards">실적</button>
+      <button data-tab="import">가져오기</button>
       <button data-tab="settings">설정</button>
     </nav>
 
@@ -97,6 +98,25 @@
           <button id="pNext" class="ghost small">▶</button>
         </div>
         <div id="cardBoards"></div>
+      </section>
+
+      <!-- 명세서 가져오기 -->
+      <section id="tab-import" class="tab" hidden>
+        <div class="panel">
+          <h2>카드 명세서 가져오기</h2>
+          <p class="hint">카드사 앱/홈페이지에서 받은 이용내역 엑셀(.xlsx, .xls) 또는 CSV를 올리세요. 이미 앱에 입력한 내역(같은 카드 또는 결제수단 '미기록')과 금액·날짜(±3일)가 같은 건은 <b>중복 의심</b>으로 표시하고 기본으로 빼요. 같은 명세서를 다시 올려도 이미 가져온 건은 건너뛰어요.</p>
+          <div class="grid" style="margin-top:12px">
+            <label class="span2">어느 카드의 명세서인가요?<select id="impPay"></select></label>
+            <label class="span2">파일<input id="impFile" type="file" accept=".xlsx,.xls,.csv" /></label>
+          </div>
+          <div id="impMap" class="grid map" hidden></div>
+        </div>
+        <div id="impResult" class="panel" hidden>
+          <div id="impSummary" class="summary"></div>
+          <div class="chips" id="impFilter"></div>
+          <div id="impList" class="list"></div>
+          <button id="impConfirm" class="primary block">가져오기</button>
+        </div>
       </section>
 
       <!-- 설정 -->
