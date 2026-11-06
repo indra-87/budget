@@ -17,6 +17,7 @@ export const DEFAULT_SETTINGS = {
     '379183******320': 'samsung_andmileage',
   },
   // 쏠 플랜+ 담을수록: 결제계좌 전월 잔액 조건 (월별로 바꾸면 solsolBalance['YYYY-MM']에 저장)
+  sunchonRate: 10,             // 순천사랑 기본 할인율(%)
   solsolAlwaysMax: true,        // 전월 실적·잔액 조건을 항상 채운다고 보고 1만5천P로 계산
   solsolBalanceDefault: '2m',
   solsolBalance: {},
@@ -33,6 +34,10 @@ export const DEFAULT_MERCHANTS = [
 export const OTHER_METHODS = ['현금', '순천사랑', '계좌이체', '기타'];
 // 구글폼에서 옮겨온 기존 기록처럼 결제수단을 모르는 내역
 export const LEGACY_METHOD = '미기록';
+// 미리 할인 충전해서 쓰는 결제수단: 금액(amount)은 할인된 실제 지출액, face_amount는 결제액
+export const DISCOUNT_METHOD = '순천사랑';
+export const DISCOUNT_RATES = [0, 5, 10, 15, 20];
+export const discounted = (face, rate) => Math.round((Number(face) || 0) * (100 - (Number(rate) || 0)) / 100);
 
 // ── 공통 유틸 ────────────────────────────────────────────────
 export const norm = (s) => String(s || '').toLowerCase().replace(/[\s\-_.·()]/g, '');

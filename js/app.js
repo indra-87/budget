@@ -1,6 +1,6 @@
 import { store } from './store.js';
 import {
-  CARDS, OTHER_METHODS, LEGACY_METHOD, DEFAULT_MERCHANTS, SOLSOL_BALANCE, solsolBalanceFor, DEFAULT_SETTINGS, cardById, payName, areaLabel,
+  CARDS, OTHER_METHODS, LEGACY_METHOD, DISCOUNT_METHOD, DISCOUNT_RATES, discounted, DEFAULT_MERCHANTS, SOLSOL_BALANCE, solsolBalanceFor, DEFAULT_SETTINGS, cardById, payName, areaLabel,
   suggestArea, simulate, cardMonth, rewardIndex, periodKey, shiftPeriod, periodLabel,
   fmtReward, won, num, norm,
 } from './cards.js';
@@ -23,6 +23,7 @@ const state = {
   areaTouched: false,
   cardsPeriod: null,
   loaded: false,
+  discountRate: 10,
 };
 
 // ── 시작 ──────────────────────────────────────────────────────
@@ -65,6 +66,7 @@ function renderAll() {
   renderDatalists();
   renderMerchantChips();
   renderPayChips();
+  renderDiscount();
   updateArea();
   renderPreview();
   renderRecent();
@@ -115,6 +117,7 @@ function bindForm() {
     const n = parseAmount(f.amount.value);
     f.amount.value = n ? n.toLocaleString('ko-KR') : '';
     syncLitersFromPrice();
+    renderDiscount();
     renderPreview();
   });
   f.merchant.addEventListener('input', () => { updateArea(); renderPreview(); renderMerchantChips(); });
@@ -145,6 +148,7 @@ function readDraft() {
     area: cardById(state.payment) ? f.area.value : null,
     liters: parseFloat(f.liters.value) || null,
     note: f.note.value.trim(),
+    discount_rate: state.payment === DISCOUNT_METHOD ? state.discountRate : null,
   };
 }
 
@@ -154,6 +158,7 @@ function resetForm() {
   F().tx_date.value = keepDate;
   state.editingId = null;
   state.areaTouched = false;
+  state.discountRate = Number(state.settings.sunchonRate ?? 10);
   $('#formTitle').textContent = '새 내역';
   $('#saveBtn').textContent = '저장';
   $('#cancelEdit').hidden = true;
@@ -168,11 +173,13 @@ function loadIntoForm(t) {
   state.areaTouched = true;
   f.tx_date.value = t.tx_date;
   f.item.value = t.item;
-  f.amount.value = Number(t.amount).toLocaleString('ko-KR');
+  f.amount.value = Number(t.face_amount ?? t.amount).toLocaleString('ko-KR');
+  if (t.discount_rate != null) state.discountRate = Number(t.discount_rate);
   f.merchant.value = t.merchant || '';
   f.note.value = t.note || '';
   f.liters.value = t.liters ?? '';
   renderPayChips();
+  renderDiscount();
   updateArea(t.area);
   renderPreview();
   renderMerchantChips();
@@ -186,8 +193,27 @@ function selectPayment(p) {
   state.payment = p;
   state.areaTouched = false;
   renderPayChips();
+  renderDiscount();
   updateArea();
   renderPreview();
+}
+
+// 순천사랑: 할인율 선택 + 실제 지출액 표시
+function renderDiscount() {
+  const box = $('#discountWrap');
+  if (state.payment !== DISCOUNT_METHOD) { box.hidden = true; return; }
+  box.hidden = false;
+  const face = parseAmount(F().amount.value);
+  const r = state.discountRate;
+  $('#discountChips').innerHTML = DISCOUNT_RATES.map((x) =>
+    `<button type="button" class="chip ${x === r ? 'on' : ''}" data-rate="${x}">${x}%</button>`).join('');
+  $('#discountChips').querySelectorAll('[data-rate]').forEach((b) => b.addEventListener('click', () => {
+    state.discountRate = Number(b.dataset.rate);
+    renderDiscount();
+  }));
+  $('#discountInfo').innerHTML = face
+    ? `실제 지출 <b>${won(discounted(face, r))}</b> <span class="hint">(결제 ${won(face)} − 할인 ${won(face - discounted(face, r))})</span>`
+    : '금액 칸에는 순천사랑으로 결제한 금액을 넣으세요. 저장할 때 할인된 금액으로 기록돼요.';
 }
 
 function renderPayChips() {
@@ -257,8 +283,12 @@ async function onSave(e) {
   if (!d.item) return toast('내역을 입력하세요');
   if (!d.amount) return toast('금액을 입력하세요');
   const card = cardById(d.payment);
+  const isDisc = d.payment === DISCOUNT_METHOD;
   const rec = {
-    tx_date: d.tx_date, item: d.item, amount: d.amount, payment: d.payment,
+    tx_date: d.tx_date, item: d.item, payment: d.payment,
+    amount: isDisc ? discounted(d.amount, d.discount_rate) : d.amount,
+    face_amount: isDisc ? d.amount : null,
+    discount_rate: isDisc ? d.discount_rate : null,
     merchant: d.merchant || null, area: card ? d.area : null,
     liters: card?.id === 'shinhan_hipoint' && d.area === 'fuel' ? d.liters : null,
     note: d.note || null,
@@ -292,7 +322,7 @@ function txRow(t, { actions = false } = {}) {
   const rw = r ? `<span class="rw ${r.earned === 0 ? 'zero' : ''}" title="${esc(r.detail)}">+${fmtReward(r.card, r.earned)}</span>` : '<span></span>';
   return `<div class="tx ${actions ? '' : 'clickable'}" data-id="${t.id}">
     <span class="t1">${esc(t.item)}</span><span class="amt">${won(t.amount)}</span>
-    <span class="t2">${t.tx_date} · ${esc(t.merchant || '-')} · ${esc(payName(t.payment))}${card && t.area ? ` · ${esc(areaLabel(card, t.area))}` : ''}${t.note ? ` · ${esc(t.note)}` : ''}</span>${rw}
+    <span class="t2">${t.tx_date} · ${esc(t.merchant || '-')} · ${esc(payName(t.payment))}${card && t.area ? ` · ${esc(areaLabel(card, t.area))}` : ''}${t.face_amount != null ? ` · 결제 ${won(t.face_amount)} (${t.discount_rate}% 할인)` : ''}${t.note ? ` · ${esc(t.note)}` : ''}</span>${rw}
     ${actions ? `<div class="acts"><button class="ghost small" data-edit>수정</button><button class="ghost small danger" data-del>삭제</button></div>` : ''}
   </div>`;
 }
@@ -390,12 +420,12 @@ function renderHistory() {
 
 function exportCsv() {
   const rows = filteredTxs();
-  const head = ['날짜', '내역', '금액', '결제수단', '사용처', '적립구분', '적립', '비고'];
+  const head = ['날짜', '내역', '금액(실제 지출)', '결제액', '할인율', '결제수단', '사용처', '적립구분', '적립', '비고'];
   const cell = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
   const lines = rows.map((t) => {
     const card = cardById(t.payment);
     const r = state.rewards.get(t.id);
-    return [t.tx_date, t.item, t.amount, payName(t.payment), t.merchant, card ? areaLabel(card, t.area) : '', r ? fmtReward(r.card, r.earned) : '', t.note].map(cell).join(',');
+    return [t.tx_date, t.item, t.amount, t.face_amount ?? t.amount, t.discount_rate != null ? `${t.discount_rate}%` : '', payName(t.payment), t.merchant, card ? areaLabel(card, t.area) : '', r ? fmtReward(r.card, r.earned) : '', t.note].map(cell).join(',');
   });
   const blob = new Blob(['﻿' + [head.map(cell).join(','), ...lines].join('\n')], { type: 'text/csv;charset=utf-8' });
   const a = document.createElement('a');
@@ -448,7 +478,10 @@ function renderCards() {
   }).join('');
   const others = [...OTHER_METHODS, LEGACY_METHOD].map((m) => {
     const list = state.txs.filter((t) => t.payment === m && periodKey(t.tx_date, s.cycleStartDay) === p);
-    return list.length ? `<tr><td>${esc(m)}</td><td class="r">${list.length}건</td><td class="r">${won(list.reduce((x, t) => x + Number(t.amount), 0))}</td></tr>` : '';
+    if (!list.length) return '';
+    const spent = list.reduce((x, t) => x + Number(t.amount), 0);
+    const face = list.reduce((x, t) => x + Number(t.face_amount ?? t.amount), 0);
+    return `<tr><td>${esc(m)}${face !== spent ? `<div class="hint">결제 ${won(face)} · 할인 ${won(face - spent)}</div>` : ''}</td><td class="r">${list.length}건</td><td class="r">${won(spent)}</td></tr>`;
   }).join('');
   $('#cardBoards').innerHTML = boards + (others ? `<div class="panel"><h3>기타 결제수단</h3><table><tbody>${others}</tbody></table></div>` : '');
   $('#cardBoards').querySelectorAll('[data-solsol]').forEach((el) => el.addEventListener('change', onSolsolChange));
@@ -486,6 +519,7 @@ function bindSettings() {
       favoriteMerchants: f.favoriteMerchants.value.split(',').map((x) => x.trim()).filter(Boolean),
       solsolBalanceDefault: f.solsolBalanceDefault.value,
       solsolAlwaysMax: f.solsolAlwaysMax.checked,
+      sunchonRate: Number(f.sunchonRate.value),
     };
     try {
       await store.saveSettings(next);
@@ -506,6 +540,7 @@ function renderSettings() {
   f.favoriteMerchants.value = (s.favoriteMerchants || []).join(', ');
   f.solsolBalanceDefault.value = s.solsolBalanceDefault || '2m';
   f.solsolAlwaysMax.checked = s.solsolAlwaysMax !== false;
+  f.sunchonRate.value = String(s.sunchonRate ?? 10);
 }
 
 // ── 명세서 가져오기 탭 ────────────────────────────────────────
@@ -688,7 +723,7 @@ function renderImport() {
 }
 
 async function onImportConfirm() {
-  const { inserts, links } = buildCommit(imp.items);
+  const { inserts, links } = buildCommit(imp.items, { discountRate: Number(state.settings.sunchonRate ?? 10) });
   if (!inserts.length && !links.length) return;
   const btn = $('#impConfirm');
   btn.disabled = true;

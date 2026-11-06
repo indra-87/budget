@@ -53,6 +53,11 @@
               <span class="lbl">결제수단</span>
               <div id="payChips" class="chips"></div>
             </div>
+            <div id="discountWrap" class="span2 fuel" hidden>
+              <span class="lbl">순천사랑 충전 할인율</span>
+              <div id="discountChips" class="chips"></div>
+              <p id="discountInfo" class="hint"></p>
+            </div>
             <label id="areaWrap" class="span2" hidden>
               <span>적립 구분 <span id="areaBadge" class="badge"></span></span>
               <select name="area"></select>
@@ -128,6 +133,9 @@
             <label>마일리지 가치 (1마일 = 원)<input name="mileValue" inputmode="decimal" /></label>
             <label class="span2">실적 기간 시작일
               <select name="cycleStartDay"></select>
+            </label>
+            <label class="span2">순천사랑 기본 할인율 (명세서 가져오기에도 적용)
+              <select name="sunchonRate"><option value="0">0%</option><option value="5">5%</option><option value="10">10%</option><option value="15">15%</option><option value="20">20%</option></select>
             </label>
             <label class="span2 check"><input type="checkbox" name="solsolAlwaysMax" /> 쏠 플랜+ 담을수록: 전월 조건 항상 충족 (월 1만5천P 한도로 계산)</label>
             <label class="span2">쏠 플랜+ 담을수록: 평소 결제계좌 잔액 조건 (위 항목을 끈 경우에만 사용)

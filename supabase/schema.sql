@@ -61,3 +61,8 @@ alter table public.gb_transactions
   add column if not exists import_key text;                        -- 명세서 행 식별키
 create index if not exists gb_transactions_import_key_idx
   on public.gb_transactions (user_id, import_key) where import_key is not null;
+
+-- 5) 충전 할인 결제(순천사랑) (2026-11 추가): amount = 실제 지출액
+alter table public.gb_transactions
+  add column if not exists face_amount integer check (face_amount is null or face_amount >= 0),
+  add column if not exists discount_rate smallint check (discount_rate is null or (discount_rate between 0 and 100));

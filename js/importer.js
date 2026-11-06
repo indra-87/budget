@@ -4,7 +4,10 @@
 //  2) 행을 정리한 뒤
 //  3) 이미 저장된 내역과 비교해 신규 / 중복 의심 / 이미 가져옴 / 취소 로 분류
 // ─────────────────────────────────────────────────────────────
-import { norm, suggestArea, cardById, LEGACY_METHOD } from './cards.js';
+import { norm, suggestArea, cardById, LEGACY_METHOD, DISCOUNT_METHOD, discounted } from './cards.js';
+
+// 할인 결제(순천사랑)는 명세서 금액 = 결제액(face_amount)
+const faceOf = (t) => Number(t.face_amount ?? t.amount);
 
 // ── 사용처 이름 통일 (명세서 가맹점명 → 앱에서 쓰는 이름) ──────────
 const ALIASES = [
@@ -156,7 +159,7 @@ function findCombo(target, cands, maxSize = 5) {
     if (picked.length >= maxSize || sum >= target) return;
     for (let i = start; i < list.length; i++) {
       picked.push(list[i]);
-      walk(i + 1, sum + Number(list[i].amount), picked);
+      walk(i + 1, sum + faceOf(list[i]), picked);
       picked.pop();
     }
   };
@@ -212,13 +215,13 @@ export function classify(rows, txs, defaultPayment, { windowDays = 3, cardMap = 
   const score = (it, t) => dayDiff(it.date, t.tx_date) * 10 + (t.payment === it.payment ? 0 : 3) - (sameMerchant(it.merchantRaw, t.merchant) ? 20 : 0);
   // 4-1) 금액이 같은 1건
   for (const it of live) {
-    const cands = pool.filter((t) => inPool(t, it.payment) && Number(t.amount) === it.amount && dayDiff(it.date, t.tx_date) <= windowDays)
+    const cands = pool.filter((t) => inPool(t, it.payment) && faceOf(t) === it.amount && dayDiff(it.date, t.tx_date) <= windowDays)
       .sort((a, b) => score(it, a) - score(it, b));
     if (cands.length) { it.status = 'dup'; it.checked = false; it.matches = [cands[0]]; used.add(cands[0].id); }
   }
   // 4-2) 여러 건의 합 (같은 사용처, 같은 날 ±1일)
   for (const it of live.filter((x) => x.status === 'new')) {
-    const cands = pool.filter((t) => inPool(t, it.payment) && Number(t.amount) < it.amount
+    const cands = pool.filter((t) => inPool(t, it.payment) && faceOf(t) < it.amount
       && dayDiff(it.date, t.tx_date) <= 1 && sameMerchant(it.merchantRaw, t.merchant));
     const combo = findCombo(it.amount, cands);
     if (combo) { it.status = 'dup'; it.checked = false; it.matches = combo; combo.forEach((t) => used.add(t.id)); }
@@ -226,15 +229,15 @@ export function classify(rows, txs, defaultPayment, { windowDays = 3, cardMap = 
   // 4-3) 금액이 비슷한 1건 (배송비·할인 차이) → 기본은 가져오고, 같은 결제면 체크 해제
   for (const it of live.filter((x) => x.status === 'new')) {
     const cands = pool.filter((t) => inPool(t, it.payment) && dayDiff(it.date, t.tx_date) <= 1
-      && sameMerchant(it.merchantRaw, t.merchant) && Math.abs(Number(t.amount) - it.amount) <= it.amount * 0.2)
-      .sort((a, b) => Math.abs(a.amount - it.amount) - Math.abs(b.amount - it.amount));
+      && sameMerchant(it.merchantRaw, t.merchant) && Math.abs(faceOf(t) - it.amount) <= it.amount * 0.2)
+      .sort((a, b) => Math.abs(faceOf(a) - it.amount) - Math.abs(faceOf(b) - it.amount));
     if (cands.length) { it.status = 'similar'; it.matches = [cands[0]]; used.add(cands[0].id); }
   }
   return items;
 }
 
 // 확정: 넣을 행과, 같은 결제로 확인된 기존 내역에 붙일 정보
-export function buildCommit(items) {
+export function buildCommit(items, { discountRate = 10 } = {}) {
   const inserts = [], links = [];
   for (const it of items) {
     const card = cardById(it.payment);
@@ -243,6 +246,8 @@ export function buildCommit(items) {
         tx_date: it.date, item: it.merchantRaw || it.merchant || '(가맹점 없음)', amount: it.amount, payment: it.payment,
         merchant: it.merchant || null, area: card ? it.area : null, liters: null, note: null,
         source: 'import', import_key: it.key,
+        ...(it.payment === DISCOUNT_METHOD
+          ? { amount: discounted(it.amount, discountRate), face_amount: it.amount, discount_rate: discountRate } : {}),
       });
     } else if (!it.checked && ['dup', 'similar'].includes(it.status)) {
       it.matches.forEach((t, i) => {
@@ -251,7 +256,7 @@ export function buildCommit(items) {
           patch.payment = it.payment;
           patch.area = card ? (it.overseas && it.area === 'overseas' ? 'overseas' : suggestArea(card, `${t.merchant || ''} ${it.merchantRaw}`)) : null;
         }
-        if (it.status === 'similar' && Number(t.amount) !== it.amount) {
+        if (it.status === 'similar' && faceOf(t) !== it.amount) {
           patch.note = [t.note, `카드 결제액 ${it.amount.toLocaleString('ko-KR')}원`].filter(Boolean).join(' · ');
         }
         links.push({ id: t.id, patch });

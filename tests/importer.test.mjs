@@ -91,4 +91,16 @@ ok('승인번호 없을 때 같은 날 같은 금액 2건 구분', () => {
   const items = classify(extractRows(t, headerRow, cols, today), [], 'shinhan_hipoint');
   assert.notEqual(items[0].key, items[1].key);
 });
+
+
+ok('순천사랑: 명세서 금액은 결제액(face)과 비교, 가져올 때 할인 적용', () => {
+  const t = [['거래일', '가맹점', '금액'], ['2026-11-04', '동네마트', 10000], ['2026-11-05', '빵집', 5000]];
+  const { headerRow, cols } = findHeader(t);
+  const txs = [{ id: 's', tx_date: '2026-11-04', item: '장보기', amount: 9000, face_amount: 10000, discount_rate: 10, payment: '순천사랑', merchant: '동네마트' }];
+  const items = classify(extractRows(t, headerRow, cols, today), txs, '순천사랑');
+  assert.equal(items[0].status, 'dup');
+  const { inserts } = buildCommit(items, { discountRate: 15 });
+  assert.equal(inserts.length, 1);
+  assert.deepEqual([inserts[0].amount, inserts[0].face_amount, inserts[0].discount_rate], [4250, 5000, 15]);
+});
 console.log('\n가져오기 테스트 통과');

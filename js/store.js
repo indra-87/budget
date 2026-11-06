@@ -8,7 +8,7 @@ if (!isDemo) {
   sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 }
 
-const COLS = 'id,tx_date,item,amount,payment,merchant,area,liters,note,source,import_key,created_at';
+const COLS = 'id,tx_date,item,amount,payment,merchant,area,liters,note,source,import_key,face_amount,discount_rate,created_at';
 const LS_TX = 'gagyebu.demo.transactions';
 const LS_SET = 'gagyebu.demo.settings';
 const lsGet = (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch { return d; } };
