@@ -68,7 +68,7 @@ ok('분류: 중복(단건/묶음), 신규, 취소 짝', () => {
   assert.equal(by('네이버페이').status, 'dup');
   assert.equal(by('네이버페이').matches[0].id, 'd');
 
-  const { inserts, links } = buildCommit(items, 'shinhan_solplan');
+  const { inserts, links } = buildCommit(items);
   assert.equal(inserts.length, 1);
   assert.equal(inserts[0].item, '넷플릭스');
   assert.equal(links.length, 4);

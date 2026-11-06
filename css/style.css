@@ -160,3 +160,5 @@ td.r, th.r { text-align: right; white-space: nowrap; }
 .imp.off .t1, .imp.off .amt { color: var(--muted); }
 .badge.bad { background: var(--bad-soft); color: var(--bad); }
 #impFilter { margin: 8px 0; }
+.cardmap { flex-direction: row; align-items: center; justify-content: space-between; gap: 10px; margin-top: 6px; color: var(--text); }
+.cardmap select { width: auto; min-width: 150px; }

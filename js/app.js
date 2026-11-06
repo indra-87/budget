@@ -49,7 +49,8 @@ async function showApp() {
   if (state.loaded) return;
   state.loaded = true;
   try {
-    state.settings = { ...DEFAULT_SETTINGS, ...(await store.getSettings()) };
+    const saved = await store.getSettings();
+    state.settings = { ...DEFAULT_SETTINGS, ...saved, cardMap: { ...DEFAULT_SETTINGS.cardMap, ...(saved.cardMap || {}) } };
     state.txs = await store.list();
   } catch (e) {
     toast(`불러오기 실패: ${e.message}`);
@@ -574,28 +575,59 @@ function runClassify() {
     return;
   }
   const rows = extractRows(imp.table, imp.headerRow, c, new Date());
-  imp.items = classify(rows, state.txs, pay);
+  imp.rows = rows;
+  renderCardMap();
+  imp.items = classify(rows, state.txs, pay, { cardMap: state.settings.cardMap });
   imp.filter = 'all';
   renderImport();
+}
+
+const linkCount = (items) => items.filter((x) => ['dup', 'similar'].includes(x.status) && !x.checked).length;
+
+// 파일 안 카드 구분값별로 결제수단 고르기
+function renderCardMap() {
+  const labels = [...new Set(imp.rows.map((r) => r.cardLabel).filter(Boolean))];
+  imp.multiCard = labels.length > 0;
+  let box = $('#impCards');
+  if (!box) {
+    box = document.createElement('div');
+    box.id = 'impCards';
+    box.className = 'span2';
+    $('#impMap').appendChild(box);
+  }
+  if (!labels.length) { box.innerHTML = ''; return; }
+  const opts = [...CARDS.map((c) => [c.id, c.name]), ['체크카드', '체크카드'], ['기타', '기타'], ['skip', '가져오지 않음']];
+  const map = state.settings.cardMap || {};
+  box.innerHTML = '<span class="lbl">파일 안의 카드 구분</span>' + labels.map((l) => {
+    const n = imp.rows.filter((r) => r.cardLabel === l).length;
+    const cur = map[l] || $('#impPay').value;
+    return `<label class="cardmap"><span>${esc(l)} <span class="hint">(${n}건)</span></span>
+      <select data-card="${esc(l)}">${opts.map(([v, t]) => `<option value="${v}" ${v === cur ? 'selected' : ''}>${esc(t)}</option>`).join('')}</select></label>`;
+  }).join('');
+  box.querySelectorAll('[data-card]').forEach((s) => s.addEventListener('change', async () => {
+    state.settings = { ...state.settings, cardMap: { ...state.settings.cardMap, [s.dataset.card]: s.value } };
+    try { await store.saveSettings(state.settings); } catch { /* 저장 실패해도 이번 가져오기는 진행 */ }
+    runClassify();
+  }));
 }
 
 const ST = {
   new: ['신규', 'good'], dup: ['중복 의심', 'warn'], imported: ['이미 가져옴', 'manual'],
   cancel: ['취소', 'bad'], cancelled: ['취소된 결제', 'bad'],
+  similar: ['비슷한 내역 있음', 'warn'], skipped: ['가져오지 않는 카드', 'manual'],
 };
 
 function renderImport() {
-  const pay = $('#impPay').value;
-  const card = cardById(pay);
   const items = imp.items;
   const count = (s) => items.filter((x) => x.status === s).length;
   const picked = items.filter((x) => x.checked);
   $('#impResult').hidden = false;
-  $('#impSummary').innerHTML = `${esc(imp.fileName)} · ${items.length}건 — 신규 <b>${count('new')}</b> · 중복 의심 <b>${count('dup')}</b> · 이미 가져옴 ${count('imported')} · 취소 ${count('cancel') + count('cancelled')}<br>`
+  $('#impSummary').innerHTML = `${esc(imp.fileName)} · ${items.length}건 — 신규 <b>${count('new')}</b> · 중복 의심 <b>${count('dup')}</b> · 비슷한 내역 ${count('similar')} · 이미 가져옴 ${count('imported')} · 취소 ${count('cancel') + count('cancelled')}${count('skipped') ? ` · 제외 카드 ${count('skipped')}` : ''}<br>`
     + `가져올 건: <b>${picked.length}건 ${won(picked.reduce((a, x) => a + x.amount, 0))}</b>`
-    + (count('dup') ? ` · 중복으로 처리할 ${items.filter((x) => x.status === 'dup' && !x.checked).length}건은 기존 내역에 이 카드 정보가 연결돼요` : '');
+    + (linkCount(items) ? ` · 중복으로 처리할 ${linkCount(items)}건은 기존 내역에 카드 정보가 연결돼요` : '');
 
-  const filters = [['all', '전체'], ['new', '신규'], ['dup', '중복 의심'], ['cancel', '취소'], ['imported', '이미 가져옴']];
+  const filters = [['all', '전체'], ['new', '신규'], ['dup', '중복 의심'], ['similar', '비슷한 내역'], ['cancel', '취소'], ['imported', '이미 가져옴']]
+    .filter(([k]) => k === 'all' || items.some((x) => x.status === k || (k === 'cancel' && x.status === 'cancelled')));
   $('#impFilter').innerHTML = filters.map(([k, l]) => `<button class="chip ${imp.filter === k ? 'on' : ''}" data-f="${k}">${l}</button>`).join('');
   $('#impFilter').querySelectorAll('[data-f]').forEach((b) => b.addEventListener('click', () => { imp.filter = b.dataset.f; renderImport(); }));
 
@@ -603,17 +635,20 @@ function renderImport() {
   $('#impList').innerHTML = shown.length ? shown.map((it) => {
     const idx = items.indexOf(it);
     const [label, cls] = ST[it.status];
+    const card = cardById(it.payment);
     const areaSel = card && it.checked
       ? `<select data-area="${idx}">${card.areas.map((a) => `<option value="${a.key}" ${a.key === it.area ? 'selected' : ''}>${esc(a.label)}</option>`).join('')}</select>` : '';
     const match = it.matches.length
-      ? `<div class="match">${it.checked ? '체크 해제하면 아래 기존 내역과 같은 결제로 처리' : '↔ 이미 입력한 내역'}${it.matches.length > 1 ? ` (${it.matches.length}건 합계)` : ''}:<br>${it.matches.map((t) =>
+      ? `<div class="match">${it.status === 'similar'
+          ? (it.checked ? '금액이 비슷한 내역이 있어요. 같은 결제면 체크를 해제하세요' : '↔ 아래 내역과 같은 결제로 처리 (금액 차이는 비고에 기록)')
+          : (it.checked ? '체크 해제하면 아래 기존 내역과 같은 결제로 처리' : '↔ 이미 입력한 내역')}${it.matches.length > 1 ? ` (${it.matches.length}건 합계)` : ''}:<br>${it.matches.map((t) =>
           `${t.tx_date} · ${esc(t.merchant || '-')} · ${esc(t.item)} · <b>${won(t.amount)}</b> (${esc(payName(t.payment))})`).join('<br>')}</div>` : '';
     const pair = it.pair ? ` · ${it.status === 'cancel' ? '원거래' : '취소건'} ${it.pair}행` : '';
     const note = it.status === 'cancel' && !it.pair ? ' · 원거래가 이미 저장돼 있다면 내역 탭에서 직접 삭제하세요' : '';
     return `<div class="imp ${it.checked ? '' : 'off'}">
-      <input type="checkbox" data-chk="${idx}" ${it.checked ? 'checked' : ''} ${['imported', 'cancel'].includes(it.status) ? 'disabled' : ''} />
+      <input type="checkbox" data-chk="${idx}" ${it.checked ? 'checked' : ''} ${['imported', 'cancel', 'skipped'].includes(it.status) ? 'disabled' : ''} />
       <span class="t1">${esc(it.merchantRaw || '(가맹점 없음)')}</span><span class="amt">${it.cancel ? '-' : ''}${won(it.amount)}</span>
-      <div class="sub">${it.date} · <span class="badge ${cls}">${label}</span>${it.merchant && it.merchant !== it.merchantRaw ? ` · 사용처: ${esc(it.merchant)}` : ''}${pair}${note}${areaSel ? '<br>' + areaSel : ''}</div>
+      <div class="sub">${it.date} · <span class="badge ${cls}">${label}</span>${it.cardLabel || imp.multiCard ? ` · ${esc(payName(it.payment))}` : ''}${it.overseas ? ' · 해외' : ''}${it.merchant && it.merchant !== it.merchantRaw ? ` · 사용처: ${esc(it.merchant)}` : ''}${pair}${note}${areaSel ? '<br>' + areaSel : ''}</div>
       ${match}
     </div>`;
   }).join('') : '<div class="empty-msg">해당하는 행이 없어요</div>';
@@ -625,14 +660,13 @@ function renderImport() {
   $('#impList').querySelectorAll('[data-area]').forEach((el) => el.addEventListener('change', () => {
     items[el.dataset.area].area = el.value;
   }));
-  const links = items.filter((x) => x.status === 'dup' && !x.checked).length;
+  const links = linkCount(items);
   $('#impConfirm').textContent = `${picked.length}건 가져오기${links ? ` + 중복 ${links}건 연결` : ''}`;
   $('#impConfirm').disabled = !picked.length && !links;
 }
 
 async function onImportConfirm() {
-  const pay = $('#impPay').value;
-  const { inserts, links } = buildCommit(imp.items, pay);
+  const { inserts, links } = buildCommit(imp.items);
   if (!inserts.length && !links.length) return;
   const btn = $('#impConfirm');
   btn.disabled = true;

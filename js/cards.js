@@ -10,6 +10,12 @@ export const DEFAULT_SETTINGS = {
   mileValue: 20,            // 1마일 = ?원 (카드 간 비교용)
   cycleStartDay: 1,         // 실적 기간 시작일 (1 = 매월 1일~말일)
   favoriteMerchants: ['G마켓', '11번가', '쿠팡', '옥션', '네이버'],
+  // 명세서의 카드 구분값 → 결제수단 (가져오기 탭에서 바꾸면 저장됨)
+  cardMap: {
+    '본인008*': 'shinhan_hipoint',
+    '본인991*': 'shinhan_solplan',
+    '379183******320': 'samsung_andmileage',
+  },
 };
 
 export const DEFAULT_MERCHANTS = [
@@ -177,7 +183,7 @@ export const CARDS = [
     id: 'shinhan_hipoint', name: '신한 하이포인트', short: '하이포인트', unit: 'P', color: '#2563eb',
     defaultArea: 'general',
     areas: [
-      { key: 'fuel', label: '주유 특별 (L당 60P)', keywords: ['S-OIL', '에쓰오일', '현대오일뱅크', '오일뱅크'] },
+      { key: 'fuel', label: '주유 특별 (L당 60P)', keywords: ['S-OIL', '에쓰오일', '현대오일뱅크', '오일뱅크', '주유소'] },
       { key: 'shopping', label: '쇼핑 특별 5%', keywords: ['롯데백화점', '현대백화점', '롯데마트', '이마트', '홈플러스', '토이저러스', 'CJ온스타일', 'CJ오쇼핑', '씨제이이엔엠'], exclude: ['이마트24'] },
       { key: 'overseas', label: '해외 5%', keywords: ['해외'] },
       { key: 'general', label: '일반 2%' },
@@ -190,7 +196,7 @@ export const CARDS = [
     areas: [
       { key: 'delivery', label: '배달 5%', keywords: ['땡겨요', '요기요', '위대한상사', '배달의민족', '우아한형제들', '배민', '쿠팡이츠'] },
       { key: 'online', label: '온라인쇼핑 5%', keywords: ['쿠팡', 'coupang', 'SSG', '쓱닷컴', '에스에스지닷컴', '무신사', '29CM'] },
-      { key: 'fuel', label: '주유 5%', keywords: ['SK주유', 'SK에너지', '에스케이에너지', 'SK엔크린', 'GS칼텍스', '지에스칼텍스', 'GS주유', '칼텍스'] },
+      { key: 'fuel', label: '주유 5%', keywords: ['SK주유', 'SK에너지', '에스케이에너지', 'SK엔크린', 'GS칼텍스', '지에스칼텍스', 'GS주유', '칼텍스', '주유소'] },
       { key: 'general', label: '기본 1.5%' },
     ],
     compute: computeSol,
@@ -203,7 +209,7 @@ export const CARDS = [
         key: 'extra', label: '추가적립처 (1천원당 2마일)',
         keywords: ['백화점', '주유', 'S-OIL', 'SK에너지', 'GS칼텍스', '칼텍스', '오일뱅크',
           '커피', '카페', '스타벅스', '투썸', '이디야', '메가커피', '메가MGC', '빽다방', '컴포즈', '폴바셋', '할리스', '커피빈',
-          '편의점', 'GS25', '지에스25', 'CU', '씨유', '비지에프리테일', '세븐일레븐', '코리아세븐', '이마트24', '미니스톱', '택시', '카카오T', '카카오택시', '카카오모빌리티'],
+          '편의점', 'GS25', '지에스25', 'CU', '씨유', '비지에프', '세븐일레븐', '코리아세븐', '이마트24', '미니스톱', '택시', '카카오T', '카카오택시', '카카오모빌리티'],
       },
       { key: 'base', label: '기본 (1천원당 1마일)' },
     ],
