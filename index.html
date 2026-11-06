@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>가계부 · 카드 실적</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <!-- 로그인 -->
+  <div id="login" class="login" hidden>
+    <form id="loginForm" class="panel login-box">
+      <h1>가계부</h1>
+      <label>이메일<input name="email" type="email" autocomplete="username" required /></label>
+      <label>비밀번호<input name="password" type="password" autocomplete="current-password" required /></label>
+      <button class="primary" type="submit">로그인</button>
+      <p id="loginError" class="error"></p>
+    </form>
+  </div>
+
+  <div id="app" hidden>
+    <header class="top">
+      <h1>가계부</h1>
+      <span id="modeBadge" class="badge warn" hidden>데모 모드 · 이 브라우저에만 저장</span>
+      <button id="logoutBtn" class="ghost small" hidden>로그아웃</button>
+    </header>
+
+    <nav class="tabs">
+      <button data-tab="input" class="active">입력</button>
+      <button data-tab="history">내역</button>
+      <button data-tab="cards">카드 실적</button>
+      <button data-tab="settings">설정</button>
+    </nav>
+
+    <main>
+      <!-- 입력 -->
+      <section id="tab-input" class="tab">
+        <form id="txForm" class="panel" autocomplete="off">
+          <div class="row-between">
+            <h2 id="formTitle">새 내역</h2>
+            <button type="button" id="cancelEdit" class="ghost small" hidden>편집 취소</button>
+          </div>
+          <div class="grid">
+            <label>날짜<input type="date" name="tx_date" required /></label>
+            <label>금액(원)<input name="amount" inputmode="numeric" placeholder="0" required /></label>
+            <label class="span2">내역<input name="item" list="itemList" placeholder="예: 생수 2L × 12" required /></label>
+            <div id="itemHistory" class="span2 past"></div>
+            <label class="span2">사용처<input name="merchant" list="merchantList" placeholder="직접 입력하거나 아래에서 선택" /></label>
+            <div id="merchantChips" class="chips span2"></div>
+            <div class="span2">
+              <span class="lbl">결제수단</span>
+              <div id="payChips" class="chips"></div>
+            </div>
+            <label id="areaWrap" class="span2" hidden>
+              <span>적립 구분 <span id="areaBadge" class="badge"></span></span>
+              <select name="area"></select>
+            </label>
+            <div id="fuelWrap" class="span2 fuel" hidden>
+              <div class="grid">
+                <label>주유량(L)<input name="liters" inputmode="decimal" placeholder="영수증의 리터" /></label>
+                <label>리터당 단가(원)<input name="unit_price" inputmode="numeric" placeholder="주유소 표시 가격" /></label>
+              </div>
+              <p class="hint">둘 중 하나만 넣어도 돼요. 단가를 넣으면 리터를 자동 계산하고, 둘 다 비우면 설정의 추정 단가로 계산해요.</p>
+            </div>
+            <label class="span2">비고<input name="note" placeholder="옵션, 쿠폰, 할인 등" /></label>
+          </div>
+          <div id="rewardPreview" class="preview"></div>
+          <button class="primary block" type="submit" id="saveBtn">저장</button>
+        </form>
+
+        <div class="panel">
+          <h3>최근 입력</h3>
+          <div id="recentList" class="list"></div>
+        </div>
+      </section>
+
+      <!-- 내역 -->
+      <section id="tab-history" class="tab" hidden>
+        <div class="panel">
+          <div class="filters">
+            <input id="hq" type="search" placeholder="물품, 사용처, 비고 검색" />
+            <select id="hpay"></select>
+            <select id="hperiod"></select>
+            <button id="csvBtn" class="ghost small">CSV 내보내기</button>
+          </div>
+          <div id="histSummary" class="summary"></div>
+          <div id="histList" class="list"></div>
+        </div>
+      </section>
+
+      <!-- 카드 실적 -->
+      <section id="tab-cards" class="tab" hidden>
+        <div class="period-nav">
+          <button id="pPrev" class="ghost small">◀</button>
+          <strong id="pLabel"></strong>
+          <button id="pNext" class="ghost small">▶</button>
+        </div>
+        <div id="cardBoards"></div>
+      </section>
+
+      <!-- 설정 -->
+      <section id="tab-settings" class="tab" hidden>
+        <form id="settingsForm" class="panel">
+          <h2>설정</h2>
+          <div class="grid">
+            <label>주유 추정 단가 (원/L)<input name="fuelPrice" inputmode="numeric" /></label>
+            <label>마일리지 가치 (1마일 = 원)<input name="mileValue" inputmode="decimal" /></label>
+            <label class="span2">실적 기간 시작일
+              <select name="cycleStartDay"></select>
+            </label>
+            <label class="span2">자주 쓰는 사용처 (쉼표로 구분)
+              <input name="favoriteMerchants" />
+            </label>
+          </div>
+          <button class="primary" type="submit">설정 저장</button>
+        </form>
+      </section>
+    </main>
+  </div>
+
+  <datalist id="itemList"></datalist>
+  <datalist id="merchantList"></datalist>
+  <div id="toast" class="toast" hidden></div>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
