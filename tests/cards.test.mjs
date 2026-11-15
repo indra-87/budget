@@ -65,6 +65,7 @@ ok('쏠 플랜+ 29만원 후 10,000원 적립 / 10,001원 제외 (딱 30만원�
   assert.equal(run('shinhan_solplan', [c, d]).results.get(d.id).earned, 0);
   const r = run('shinhan_solplan', [tx(205000, 'fuel')]);
   assert.ok(r.hints.some((h) => h.includes('주유: 95,000원까지')));
+  assert.ok(r.hints.some((h) => h.includes('특별 5% 기준 약 995,000원')));  // (60,000 - 10,250)P ÷ 5%
 });
 
 // ── 앤마일리지 ──

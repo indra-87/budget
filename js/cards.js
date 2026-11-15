@@ -188,7 +188,7 @@ function computeSol(txs, s = {}, ctx = {}) {
       { label: '담을수록 SOLSOL (별도 한도)', value: ssTotal, max: ssCap, unit: 'P' },
     ],
     hints: [
-      remain > 0 ? `남은 적립 한도 ${num(remain)}P (기본 1.5% 기준 약 ${won(remain / 0.015)} 더 결제하면 한도 도달)` : '이번 달 통합 적립 한도 도달',
+      remain > 0 ? `남은 적립 한도 ${num(remain)}P (기본 1.5% 기준 약 ${won(remain / 0.015)}, 특별 5% 기준 약 ${won(remain / 0.05)} 더 결제하면 한도 도달)` : '이번 달 통합 적립 한도 도달',
       ...areaHints,
       (alwaysMax
         ? `담을수록: 한도 ${num(ssCap)}P (전월 조건 항상 충족으로 계산)`
