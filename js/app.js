@@ -1,10 +1,10 @@
-import { store } from './store.js?v=20261106135359';
+import { store } from './store.js?v=20261115065240';
 import {
   CARDS, OTHER_METHODS, LEGACY_METHOD, DISCOUNT_METHOD, DISCOUNT_RATES, discounted, DEFAULT_MERCHANTS, SOLSOL_BALANCE, solsolBalanceFor, DEFAULT_SETTINGS, cardById, payName, areaLabel,
   suggestArea, simulate, cardMonth, rewardIndex, periodKey, shiftPeriod, periodLabel,
   fmtReward, won, num, norm,
-} from './cards.js?v=20261106135359';
-import { findHeader, detectColumns, extractRows, classify, buildCommit } from './importer.js?v=20261106135359';
+} from './cards.js?v=20261115065240';
+import { findHeader, detectColumns, extractRows, classify, buildCommit } from './importer.js?v=20261115065240';
 
 const $ = (s, el = document) => el.querySelector(s);
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));

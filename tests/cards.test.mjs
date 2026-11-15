@@ -58,11 +58,13 @@ ok('쏠 플랜+ 초과 후 소액도 계속 제외', () => {
   const a = tx(290000, 'online'), b = tx(30000, 'online'), c = tx(5000, 'online');
   assert.equal(run('shinhan_solplan', [a, b, c]).results.get(c.id).earned, 0);
 });
-ok('쏠 플랜+ 29만원 후 9,000원 적립 / 10,000원 제외', () => {
-  const a = tx(290000, 'online'), b = tx(9000, 'online');
-  assert.equal(run('shinhan_solplan', [a, b]).results.get(b.id).earned, 450);
-  const c = tx(290000, 'online'), d = tx(10000, 'online');
+ok('쏠 플랜+ 29만원 후 10,000원 적립 / 10,001원 제외 (딱 30만원까지 가능)', () => {
+  const a = tx(290000, 'online'), b = tx(10000, 'online');
+  assert.equal(run('shinhan_solplan', [a, b]).results.get(b.id).earned, 500);
+  const c = tx(290000, 'online'), d = tx(10001, 'online');
   assert.equal(run('shinhan_solplan', [c, d]).results.get(d.id).earned, 0);
+  const r = run('shinhan_solplan', [tx(205000, 'fuel')]);
+  assert.ok(r.hints.some((h) => h.includes('주유: 95,000원까지')));
 });
 
 // ── 앤마일리지 ──
@@ -119,8 +121,8 @@ ok('결제 시뮬레이션', () => {
   const r = simulate(sol, all, { tx_date: '2026-11-05', amount: 30000, merchant: '쿠팡' }, S);
   assert.equal(r.earned, 0);
   assert.ok(r.warn);
-  const r2 = simulate(sol, all, { tx_date: '2026-11-05', amount: 9999, merchant: '쿠팡' }, S);
-  assert.equal(r2.earned, 499);
+  const r2 = simulate(sol, all, { tx_date: '2026-11-05', amount: 10000, merchant: '쿠팡' }, S);
+  assert.equal(r2.earned, 500);
 });
 ok('실적 기간', () => {
   assert.equal(periodKey('2026-11-06'), '2026-11');

@@ -103,10 +103,10 @@ function computeHipoint(txs, s) {
 // ── 2) 쏠 플랜+ ───────────────────────────────────────────────
 const SOL_SPECIAL = ['fuel', 'online', 'delivery'];
 const SOL_LABEL = { fuel: '주유', online: '온라인쇼핑', delivery: '배달' };
-// 영역별 월 누적 이용금액이 30만원 "미만"인 결제까지만 적립.
-// 누적이 30만원에 도달하거나 넘게 만드는 결제는 건 전체가 기본적립까지 제외되고,
+// 영역별 월 누적 이용금액이 30만원 "이하"인 결제까지 적립.
+// 누적이 30만원을 넘게 만드는 결제는 건 전체가 기본적립까지 제외되고,
 // 그 금액도 누적에 포함되므로 이후 같은 영역 결제는 계속 제외됩니다.
-// (예: 29만원 사용 후 9,000원 → 적립 / 10,000원 이상 → 제외)
+// (예: 29만원 사용 후 10,000원 → 적립 / 10,001원 이상 → 제외)
 // 담을수록 SOLSOL: OTT·멤버십·통신요금 자동납부 100% 적립 (통합 6만P 한도와 별도)
 // 한도는 전월 조건으로 결정: 전월 이용 100만원↑ + 결제계좌 잔액 조건(100만원↑ 15영업일 → 5천, 200만원↑ → 1만5천)
 // 잔액 조건 미충족이어도 전월 이용 200만원↑ → 5천, 300만원↑ → 1만5천
@@ -139,13 +139,13 @@ function computeSol(txs, s = {}, ctx = {}) {
     const area = t.area || 'general';
     let raw = 0, detail = '', warn = '';
     if (SOL_SPECIAL.includes(area)) {
-      if (spent[area] + a < AREA_LIMIT) {
+      if (spent[area] + a <= AREA_LIMIT) {
         raw = floor(a * 0.05);
         detail = `${won(a)} × 5%`;
       } else {
         raw = 0;
-        detail = '영역 월 30만원 도달 → 적립 제외';
-        warn = `${SOL_LABEL[area]} 영역 30만원 도달 — 이 결제는 기본적립까지 전액 제외`;
+        detail = '영역 월 30만원 초과 → 적립 제외';
+        warn = `${SOL_LABEL[area]} 영역 30만원 초과 — 이 결제는 기본적립까지 전액 제외`;
       }
       spent[area] += a;
     } else if (area === 'solsol' && a >= SOLSOL_MIN) {
@@ -175,7 +175,7 @@ function computeSol(txs, s = {}, ctx = {}) {
   }
   const remain = CAP - total;
   const areaHints = SOL_SPECIAL.map((k) => {
-    const left = AREA_LIMIT - spent[k] - 1;
+    const left = AREA_LIMIT - spent[k];
     return left > 0
       ? `${SOL_LABEL[k]}: ${won(left)}까지 결제 가능 (그 이상 결제하면 그 건 전액 적립 제외)`
       : `${SOL_LABEL[k]}: 이번 달 한도 소진 — 이 영역은 다른 카드로`;
