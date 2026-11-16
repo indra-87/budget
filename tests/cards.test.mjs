@@ -65,7 +65,12 @@ ok('쏠 플랜+ 29만원 후 10,000원 적립 / 10,001원 제외 (딱 30만원�
   assert.equal(run('shinhan_solplan', [c, d]).results.get(d.id).earned, 0);
   const r = run('shinhan_solplan', [tx(205000, 'fuel')]);
   assert.ok(r.hints.some((h) => h.includes('주유: 95,000원까지')));
-  assert.ok(r.hints.some((h) => h.includes('특별 5% 기준 약 995,000원')));  // (60,000 - 10,250)P ÷ 5%
+  // 주유 남은 95,000 + 온라인 300,000 + 배달 300,000 = 695,000원 → 34,750P, 나머지 15,000P ÷ 1.5% = 1,000,000원
+  assert.ok(r.hints.some((h) => h === '특별 5%: 최대 695,000원 결제 가능 (약 34,750P 적립)'));
+  assert.ok(r.hints.some((h) => h === '기본 1.5%: 특별 영역을 다 채운 뒤 약 1,000,000원 더 결제하면 한도 도달'));
+  // 특별 영역만으로 한도를 채울 수 있으면 그 금액만 표시
+  const big = run('shinhan_solplan', [tx(2000000, 'general'), tx(1000000, 'general')]); // 45,000P → 남은 15,000P
+  assert.ok(big.hints.some((h) => h.startsWith('특별 5%: 약 300,000원만 더 결제하면 한도 도달')));
 });
 
 // ── 앤마일리지 ──

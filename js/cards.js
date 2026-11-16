@@ -174,6 +174,27 @@ function computeSol(txs, s = {}, ctx = {}) {
     results.set(t.id, { raw: raw + (area === 'solsol' && a >= SOLSOL_MIN ? a : 0), earned: earned + ss, detail, warn });
   }
   const remain = CAP - total;
+  // 남은 한도를 채우는 방법: 특별 5% 영역의 남은 결제 가능액을 먼저 쓰고, 나머지를 기본 1.5%로
+  const specialRoom = SOL_SPECIAL.reduce((a, k) => a + Math.max(0, AREA_LIMIT - spent[k]), 0);
+  let capHints;
+  if (remain <= 0) {
+    capHints = ['이번 달 통합 적립 한도 도달'];
+  } else if (specialRoom * 0.05 >= remain) {
+    capHints = [
+      `남은 적립 한도 ${num(remain)}P`,
+      `특별 5%: 약 ${won(remain / 0.05)}만 더 결제하면 한도 도달 (특별 영역 남은 결제 가능액 ${won(specialRoom)} 안에서)`,
+    ];
+  } else {
+    const specialPts = Math.floor(specialRoom * 0.05);
+    const baseSpend = (remain - specialPts) / 0.015;
+    capHints = [
+      `남은 적립 한도 ${num(remain)}P`,
+      specialRoom > 0
+        ? `특별 5%: 최대 ${won(specialRoom)} 결제 가능 (약 ${num(specialPts)}P 적립)`
+        : '특별 5%: 이번 달 영역 한도 모두 소진',
+      `기본 1.5%: ${specialRoom > 0 ? '특별 영역을 다 채운 뒤 ' : ''}약 ${won(baseSpend)} 더 결제하면 한도 도달`,
+    ];
+  }
   const areaHints = SOL_SPECIAL.map((k) => {
     const left = AREA_LIMIT - spent[k];
     return left > 0
@@ -188,7 +209,7 @@ function computeSol(txs, s = {}, ctx = {}) {
       { label: '담을수록 SOLSOL (별도 한도)', value: ssTotal, max: ssCap, unit: 'P' },
     ],
     hints: [
-      remain > 0 ? `남은 적립 한도 ${num(remain)}P (기본 1.5% 기준 약 ${won(remain / 0.015)}, 특별 5% 기준 약 ${won(remain / 0.05)} 더 결제하면 한도 도달)` : '이번 달 통합 적립 한도 도달',
+      ...capHints,
       ...areaHints,
       (alwaysMax
         ? `담을수록: 한도 ${num(ssCap)}P (전월 조건 항상 충족으로 계산)`
